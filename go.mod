@@ -14,6 +14,7 @@ require (
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/prometheus/procfs v0.0.0-20190507164030-5867b95ac084 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
 )

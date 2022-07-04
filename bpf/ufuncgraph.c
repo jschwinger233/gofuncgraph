@@ -9,13 +9,14 @@
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 struct event {
-    __u64 hook_point; // 0 entry; 1 exit;
     __u64 goid;
     __u64 caller_ip;
     __u64 ip;
-    __u64 stack_depth;
     __u64 time_ns;
-    __u64 errno; // 0 no error; 1 root bp; 2 stackoverflow;
+    __u32 stack_depth;
+    __u16 hook_point; // 0 entry; 1 exit;
+    __u16 errno; // 0 no error; 1 root bp; 2 stackoverflow;
+    __u8 args[104];
 };
 
 // force emitting struct event into the ELF.
@@ -78,6 +79,14 @@ SEC("uprobe/on_entry")
 int on_entry(struct pt_regs *ctx) {
     struct event this_event;
     __builtin_memset(&this_event, 0, sizeof(this_event));
+
+    // manipulate bpf inst
+    //void *a, *b;
+    //bpf_probe_read_user(&a, sizeof(a), (void*)ctx->rax+8);
+    //bpf_probe_read_user(&b, sizeof(b), (void*)a);
+    //__builtin_memcpy(&this_event.args, &b, sizeof(b));
+    // manipulation ends
+
     __u64 this_bp = ctx->rbp;
     this_event.hook_point = 0;
     this_event.ip = ctx->rip;
