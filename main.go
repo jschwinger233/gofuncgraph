@@ -24,7 +24,7 @@ func main() {
 	help := flag.BoolP("help", "h", false, "print help")
 	flag.Parse()
 	if *help || len(flag.Args()) < 2 {
-		fmt.Println("Usage: ufuncgraph <executable> <wildcard> [<wildcard>...]\n")
+		fmt.Println("Usage: ufuncgraph <executable> <wildcard> [<wildcard>...]")
 		return
 	}
 	binPath := flag.Arg(0)

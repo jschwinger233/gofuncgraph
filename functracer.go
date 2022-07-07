@@ -37,6 +37,6 @@ func (t *Functracer) DetachUprobes() {
 
 func (t *Functracer) CollectEvents(ctx context.Context) (err error) {
 	ch := t.bpf.PollEvents(ctx)
-	PrintFuncgraph(ch, t.binPath)
+	FuncgraphStream(ch, t.binPath)
 	return
 }

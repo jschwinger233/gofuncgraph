@@ -26,6 +26,10 @@ func ParseOffsets(binPath string, wildcards []string) (entryOffsets, exitOffsets
 			matched := false
 			for _, wildcard := range wildcards {
 				if utils.MatchWildcard(wildcard, name) {
+					if _, ok := pcs[name]; ok {
+						// golang's dwarf bug: duplicate function entries
+						continue
+					}
 					matched = true
 					break
 				}
