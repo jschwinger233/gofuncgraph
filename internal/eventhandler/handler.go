@@ -5,24 +5,25 @@ import (
 	"fmt"
 
 	"github.com/jschwinger233/ufuncgraph/internal/bpf"
+	"github.com/jschwinger233/ufuncgraph/internal/symparser"
 )
 
 type EventHandler struct {
-	bin       string
-	symInterp *SymInterp
+	bin string
 }
 
-func New(bin string) (_ *EventHandler, err error) {
-	symInterp, err := NewSymInterp(bin)
+func New(bin string) *EventHandler {
 	return &EventHandler{
-		bin:       bin,
-		symInterp: symInterp,
-	}, err
+		bin: bin,
+	}
 }
 
-func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent) (err error) {
-
-	pool, err := NewGevent()
+func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent, uprobes []symparser.Uprobe) (err error) {
+	symInterp, err := NewSymInterp(h.bin)
+	if err != nil {
+		return
+	}
+	gevent, err := NewGevent(uprobes, symInterp)
 	if err != nil {
 		return
 	}
@@ -32,9 +33,12 @@ func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent) 
 			return fmt.Errorf("event error: %d", event.Errno)
 		}
 
-		pool.Add(event)
-		if pool.StackCompleted(event.Goid) {
-			pool.PrintStack(event.Goid, h.symInterp)
+		gevent.Add(event)
+		if gevent.Completed(event) {
+			if gevent.IsRootEvent(event) {
+				gevent.PrintStack(event.Goid)
+			}
+			gevent.Clear(event)
 		}
 	}
 
