@@ -4,44 +4,59 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"os"
-	"os/signal"
 
 	"github.com/cilium/ebpf/rlimit"
-	flag "github.com/spf13/pflag"
+	"github.com/urfave/cli/v2"
 )
 
 func init() {
+	// TODO: lift fileno rlimit
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func main() {
-	help := flag.BoolP("help", "h", false, "print help")
-	flag.Parse()
-	if *help || len(flag.Args()) < 2 {
-		fmt.Println("Usage: ufuncgraph <executable> <wildcard> [<wildcard>...]")
-		return
-	}
-	binPath := flag.Arg(0)
-	patterns := flag.Args()[1:]
+	app := &cli.App{
+		Name: "utrace",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "back",
+				Aliases: []string{"b"},
+				Value:   false,
+				Usage:   "backtrace, show the stack rewinding",
+			},
+			&cli.BoolFlag{
+				Name:    "funcgraph",
+				Aliases: []string{"g"},
+				Value:   false,
+				Usage:   "show function graph",
+			},
+			&cli.IntFlag{
+				Name:    "forward-depth",
+				Aliases: []string{"d"},
+				Value:   0,
+				Usage:   "forwardtrace depth",
+			},
+		},
+		Action: func(ctx *cli.Context) (err error) {
+			back, funcgraph, depth := ctx.Bool("back"), ctx.Bool("funcgraph"), ctx.Int("forward-depth")
+			bin := ctx.Args().First()
+			funcWildcards := ctx.Args().Tail()
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
-	tracer := Functracer{}
-	if err := tracer.LoadBPF(); err != nil {
-		log.Fatal(err)
+			tracer, err := NewTracer(back, funcgraph, depth)
+			if err != nil {
+				return
+			}
+			if err = tracer.Attach(bin, funcWildcards); err != nil {
+				return
+			}
+			return tracer.Tracing(bin)
+		},
 	}
-	if err := tracer.AttachUprobes(binPath, patterns); err != nil {
-		log.Fatal(err)
-	}
-	defer tracer.DetachUprobes()
-	if err := tracer.CollectEvents(ctx); err != nil {
+	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
 }
