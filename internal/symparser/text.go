@@ -1,7 +1,6 @@
 package symparser
 
 import (
-	"debug/dwarf"
 	"debug/elf"
 
 	"github.com/pkg/errors"
@@ -17,7 +16,8 @@ func (p *SymParser) findCallingFuncnames(name string) (callees []string, err err
 	for {
 		inst, err := x86asm.Decode(instructions, 64)
 		if err != nil {
-			break
+			inst = x86asm.Inst{Len: 1}
+			goto next
 		}
 		if inst.Op == x86asm.CALL && inst.Opcode>>24 == 0xe8 {
 			rel, ok := inst.Args[0].(x86asm.Rel)
@@ -35,18 +35,23 @@ func (p *SymParser) findCallingFuncnames(name string) (callees []string, err err
 		offset += uint64(inst.Len)
 		addr += uint64(inst.Len)
 		instructions = instructions[inst.Len:]
+		if len(instructions) == 0 {
+			break
+		}
 	}
 	return
 }
 
 func (p *SymParser) findFuncInstructions(name string) (instructions []byte, addr, offset uint64, err error) {
-	die, err := p.getValidDIE(name)
+	lowpc, highpc, err := p.findFuncRangeByDwarf(name)
 	if err != nil {
-		return
+		if !errors.Is(err, DIENotFoundError) {
+			return
+		}
+		if lowpc, highpc, err = p.findFuncRangeBySymtab(name); err != nil {
+			return
+		}
 	}
-
-	lowpc := die.Val(dwarf.AttrLowpc).(uint64)
-	highpc := die.Val(dwarf.AttrHighpc).(uint64)
 
 	textSection, textBytes, err := p.getTextSection()
 	if err != nil {
@@ -78,7 +83,8 @@ func (p *SymParser) findEntryExitOffsets(name string) (entry uint64, exits []uin
 	for {
 		inst, err := x86asm.Decode(instructions, 64)
 		if err != nil {
-			break
+			inst = x86asm.Inst{Len: 1}
+			goto next
 		}
 		for _, a := range inst.Args {
 			if a != nil && a.String() == "RBP" {
@@ -92,8 +98,13 @@ func (p *SymParser) findEntryExitOffsets(name string) (entry uint64, exits []uin
 		if inst.Op == x86asm.RET && foundEntry {
 			exits = append(exits, offset)
 		}
+
+	next:
 		offset += uint64(inst.Len)
 		instructions = instructions[inst.Len:]
+		if len(instructions) == 0 {
+			break
+		}
 	}
 	if entry == 0 {
 		err = errors.WithMessage(FramePointerNotFound, name)

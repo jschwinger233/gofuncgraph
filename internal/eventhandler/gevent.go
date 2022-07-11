@@ -93,3 +93,9 @@ func (p *Gevent) PrintStack(goid uint64) {
 	}
 	return
 }
+
+func (g *Gevent) PrintAll() {
+	for goid := range g.goroutine2events {
+		g.PrintStack(goid)
+	}
+}

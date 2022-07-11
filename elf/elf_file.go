@@ -26,25 +26,39 @@ func New(binPath string) (_ *ELFFile, err error) {
 	}
 	abbrev, err := godwarf.GetDebugSectionElf(elfFile, "abbrev")
 	if err != nil {
-		return
+		abbrev = nil
+	}
+	aranges, err := godwarf.GetDebugSectionElf(elfFile, "aranges")
+	if err != nil {
+		aranges = nil
 	}
 	frame, err := godwarf.GetDebugSectionElf(elfFile, "frame")
 	if err != nil {
-		return
+		section := elfFile.Section(".eh_frame")
+		frame = make([]byte, section.Size)
+		_, err = binFile.ReadAt(frame, int64(section.Offset))
 	}
 	info, err := godwarf.GetDebugSectionElf(elfFile, "info")
 	if err != nil {
-		return
+		info = nil
 	}
 	line, err := godwarf.GetDebugSectionElf(elfFile, "line")
 	if err != nil {
-		return
+		line = nil
+	}
+	pubnames, err := godwarf.GetDebugSectionElf(elfFile, "pubnames")
+	if err != nil {
+		pubnames = nil
 	}
 	ranges, err := godwarf.GetDebugSectionElf(elfFile, "ranges")
 	if err != nil {
-		return
+		ranges = nil
 	}
-	dwarfData, err := dwarf.New(abbrev, nil, frame, info, line, nil, ranges, nil)
+	str, err := godwarf.GetDebugSectionElf(elfFile, "str")
+	if err != nil {
+		str = nil
+	}
+	dwarfData, err := dwarf.New(abbrev, aranges, frame, info, line, pubnames, ranges, str)
 	if err != nil {
 		return
 	}

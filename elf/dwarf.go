@@ -1,6 +1,8 @@
 package elf
 
-import "debug/dwarf"
+import (
+	"debug/dwarf"
+)
 
 func (f *ELFFile) IterDebugInfo() <-chan *dwarf.Entry {
 	ch := make(chan *dwarf.Entry)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/jschwinger233/ufuncgraph/internal/bpf"
 	"github.com/jschwinger233/ufuncgraph/internal/symparser"
+	log "github.com/sirupsen/logrus"
 )
 
 type EventHandler struct {
@@ -34,6 +35,7 @@ func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent, 
 		}
 
 		gevent.Add(event)
+		log.Debugf("add event: %+v", event)
 		if gevent.Completed(event) {
 			if gevent.IsRootEvent(event) {
 				gevent.PrintStack(event.Goid)
@@ -42,6 +44,8 @@ func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent, 
 		}
 	}
 
-	fmt.Printf("completed, detaching uprobes\n")
+	gevent.PrintAll()
+
+	log.Info("interrupted, detaching uprobes\n")
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	myelf "github.com/jschwinger233/ufuncgraph/elf"
+	log "github.com/sirupsen/logrus"
 )
 
 type SymParser struct {
@@ -49,7 +50,7 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 			searched[funcname] = nil
 			funcnames, err := p.findCallingFuncnames(funcname)
 			if err != nil {
-				if errors.Is(err, DIENotFoundError) {
+				if errors.Is(err, DIENotFoundError) || errors.Is(err, SymbolNotFoundError) {
 					continue
 				}
 				return nil, err
@@ -66,13 +67,11 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 	for funcname := range allFuncnameSet {
 		entry, exits, err := p.findEntryExitOffsets(funcname)
 		if err != nil {
-			if errors.Is(err, DIENotFoundError) || errors.Is(err, FramePointerNotFound) || errors.Is(err, ReturnNotFound) {
+			if errors.Is(err, DIENotFoundError) || errors.Is(err, FramePointerNotFound) || errors.Is(err, ReturnNotFound) || errors.Is(err, SymbolNotFoundError) {
+				log.Warnf("failed to get uprobe: %s", err)
 				continue
 			}
 			return nil, err
-		}
-		if entry == 0 || exits[0] == 0 {
-			println()
 		}
 		_, root := oriFuncnameSet[funcname]
 		uprobes = append(uprobes, Uprobe{
@@ -81,6 +80,7 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 			Offset:   entry,
 			Root:     root,
 		})
+		log.Debugf("add uprobe %s entry: %d", funcname, entry)
 		for _, exit := range exits {
 			uprobes = append(uprobes, Uprobe{
 				Funcname: funcname,
@@ -88,6 +88,7 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 				Offset:   exit,
 			})
 		}
+		log.Debugf("add uprobe %s exits: %v", funcname, exits)
 	}
 
 	return

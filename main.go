@@ -4,10 +4,10 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/cilium/ebpf/rlimit"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -40,6 +40,17 @@ func main() {
 				Value:   0,
 				Usage:   "forwardtrace depth",
 			},
+			&cli.BoolFlag{
+				Name:  "debug",
+				Value: false,
+				Usage: "enable debug logging",
+			},
+		},
+		Before: func(c *cli.Context) error {
+			if c.Bool("debug") {
+				log.SetLevel(log.DebugLevel)
+			}
+			return nil
 		},
 		Action: func(ctx *cli.Context) (err error) {
 			back, funcgraph, depth := ctx.Bool("back"), ctx.Bool("funcgraph"), ctx.Int("forward-depth")

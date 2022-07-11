@@ -7,6 +7,7 @@ require (
 	github.com/elastic/go-sysinfo v1.8.0
 	github.com/go-delve/delve v1.8.3
 	github.com/pkg/errors v0.9.1
+	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.10.3
 	golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15
 )
