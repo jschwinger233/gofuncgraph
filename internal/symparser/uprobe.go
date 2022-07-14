@@ -4,7 +4,8 @@ type UprobeLocation int
 
 const (
 	AtEntry UprobeLocation = iota
-	AtExit
+	AtFramePointer
+	AtRet
 )
 
 type Uprobe struct {

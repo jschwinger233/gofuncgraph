@@ -45,6 +45,11 @@ func main() {
 				Value: false,
 				Usage: "enable debug logging",
 			},
+			&cli.BoolFlag{
+				Name:  "golang",
+				Value: false,
+				Usage: "tracing golang process",
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.Bool("debug") {
@@ -54,10 +59,11 @@ func main() {
 		},
 		Action: func(ctx *cli.Context) (err error) {
 			back, funcgraph, depth := ctx.Bool("back"), ctx.Bool("funcgraph"), ctx.Int("forward-depth")
+			golang := ctx.Bool("golang")
 			bin := ctx.Args().First()
 			funcWildcards := ctx.Args().Tail()
 
-			tracer, err := NewTracer(back, funcgraph, depth)
+			tracer, err := NewTracer(golang, back, funcgraph, depth)
 			if err != nil {
 				return
 			}

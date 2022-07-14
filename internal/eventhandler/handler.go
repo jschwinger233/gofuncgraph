@@ -37,8 +37,9 @@ func (h *EventHandler) Handle(ctx context.Context, ch chan bpf.UfuncgraphEvent, 
 		gevent.Add(event)
 		log.Debugf("add event: %+v", event)
 		if gevent.Completed(event) {
-			if gevent.IsRootEvent(event) {
-				gevent.PrintStack(event.Goid)
+			if true {
+				//if gevent.IsRootEvent(event) {
+				gevent.PrintStack(event.StackId)
 			}
 			gevent.Clear(event)
 		}

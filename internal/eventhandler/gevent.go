@@ -36,24 +36,24 @@ func NewGevent(uprobes []symparser.Uprobe, symInterp *SymInterp) (_ *Gevent, err
 }
 
 func (p *Gevent) Add(event bpf.UfuncgraphEvent) {
-	length := len(p.goroutine2events[event.Goid])
+	length := len(p.goroutine2events[event.StackId])
 	if length == 0 && event.HookPoint == 1 {
 		return
 	}
-	if length > 0 && event.HookPoint == 0 && p.goroutine2events[event.Goid][length-1].HookPoint == 0 && p.goroutine2events[event.Goid][length-1].StackDepth == event.StackDepth {
-		return
-	}
-	p.goroutine2events[event.Goid] = append(p.goroutine2events[event.Goid], event)
-	p.goroutine2stack[event.Goid] = p.goroutine2stack[event.Goid] - 2*uint64(event.HookPoint) + 1
+	//if length > 0 && event.HookPoint == 0 && p.goroutine2events[event.StackId][length-1].HookPoint == 0 && p.goroutine2events[event.StackId][length-1].StackDepth == event.StackDepth {
+	//	return
+	//}
+	p.goroutine2events[event.StackId] = append(p.goroutine2events[event.StackId], event)
+	p.goroutine2stack[event.StackId] = p.goroutine2stack[event.StackId] - 2*uint64(event.HookPoint) + 1
 }
 
 func (p *Gevent) Completed(event bpf.UfuncgraphEvent) bool {
-	return p.goroutine2stack[event.Goid] == 0
+	return p.goroutine2stack[event.StackId] == 0
 }
 
 func (p *Gevent) Clear(event bpf.UfuncgraphEvent) {
-	delete(p.goroutine2events, event.Goid)
-	delete(p.goroutine2stack, event.Goid)
+	delete(p.goroutine2events, event.StackId)
+	delete(p.goroutine2stack, event.StackId)
 }
 
 func (p *Gevent) IsRootEvent(event bpf.UfuncgraphEvent) bool {
@@ -75,10 +75,10 @@ func (p *Gevent) getRootEventSet() map[string]interface{} {
 	return p.cache["rootevents"].(map[string]interface{})
 }
 
-func (p *Gevent) PrintStack(goid uint64) {
+func (p *Gevent) PrintStack(StackId uint64) {
 	ident := ""
 	println()
-	for _, event := range p.goroutine2events[goid] {
+	for _, event := range p.goroutine2events[StackId] {
 		t := p.bootTime.Add(time.Duration(event.TimeNs)).Format("2006-01-02 15:04:05.0000")
 		if event.HookPoint == 0 {
 			fmt.Printf("%s %s %s { %s\n", t, ident, p.symInterp.Interp(event.Ip, withOffset(false)), p.symInterp.Interp(event.CallerIp, withOffset(true)))
@@ -95,7 +95,7 @@ func (p *Gevent) PrintStack(goid uint64) {
 }
 
 func (g *Gevent) PrintAll() {
-	for goid := range g.goroutine2events {
-		g.PrintStack(goid)
+	for StackId := range g.goroutine2events {
+		g.PrintStack(StackId)
 	}
 }

@@ -41,6 +41,32 @@ func (p *SymParser) addrToSymbol(addr uint64) (sym string, err error) {
 	return symbol.Name, nil
 }
 
+func (p *SymParser) symbolToAddr(sym string) (addr uint64, err error) {
+	_, symnames, err := p.getSymtab()
+	if err != nil {
+		return
+	}
+
+	symaddr, ok := symnames[sym]
+	if !ok {
+		err = errors.WithMessage(SymbolNotFoundError, sym)
+		return
+	}
+
+	addr = symaddr.Value
+	return
+}
+
+func (p *SymParser) findSymbolOffset(sym string) (offset uint64, err error) {
+	addr, err := p.symbolToAddr(sym)
+	if err != nil {
+		return
+	}
+
+	textSection := p.elfFile.Section(".text")
+	return addr - textSection.Addr + textSection.Offset, nil
+}
+
 func (p *SymParser) getSymtab() (symaddrs map[uint64]elf.Symbol, symnames map[string]elf.Symbol, err error) {
 	if _, ok := p.cache["symaddrs"]; ok {
 		return p.cache["symaddrs"].(map[uint64]elf.Symbol), p.cache["symnames"].(map[string]elf.Symbol), nil

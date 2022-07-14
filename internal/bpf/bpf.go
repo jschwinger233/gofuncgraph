@@ -2,6 +2,7 @@ package bpf
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -37,9 +38,14 @@ func (b *BPF) Attach(bin string, uprobes []symparser.Uprobe) (err error) {
 	for _, uprobe := range uprobes {
 		switch uprobe.Location {
 		case symparser.AtEntry:
-			err = b.AttachEntry(bin, uprobe.Offset)
-		case symparser.AtExit:
-			err = b.AttachExit(bin, uprobe.Offset)
+			err = b.AttachUprobe(bin, uprobe.Offset)
+			if err == nil {
+				err = b.AttachUretprobe(bin, uprobe.Offset)
+			}
+		case symparser.AtRet:
+			err = b.AttachRet(bin, uprobe.Offset)
+		case symparser.AtFramePointer:
+			err = b.AttachFramePointer(bin, uprobe.Offset)
 		}
 		if err != nil {
 			return
@@ -57,7 +63,7 @@ func (b *BPF) OpenExecutable(bin string) (_ *link.Executable, err error) {
 	return b.executables[bin], nil
 }
 
-func (b *BPF) AttachEntry(bin string, offset uint64) (err error) {
+func (b *BPF) AttachUprobe(bin string, offset uint64) (err error) {
 	ex, err := b.OpenExecutable(bin)
 	if err != nil {
 		return
@@ -70,12 +76,39 @@ func (b *BPF) AttachEntry(bin string, offset uint64) (err error) {
 	return
 }
 
-func (b *BPF) AttachExit(bin string, offset uint64) (err error) {
+func (b *BPF) AttachUretprobe(bin string, offset uint64) (err error) {
 	ex, err := b.OpenExecutable(bin)
 	if err != nil {
 		return
 	}
-	uprobe, err := ex.Uprobe("", b.objs.OnExit, &link.UprobeOptions{Offset: offset})
+	fmt.Printf("uretprobe: %x\n", offset)
+	uprobe, err := ex.Uretprobe("", b.objs.OnExit, &link.UprobeOptions{Offset: offset})
+	if err != nil {
+		return err
+	}
+	b.closers = append(b.closers, uprobe)
+	return
+}
+
+func (b *BPF) AttachFramePointer(bin string, offset uint64) (err error) {
+	ex, err := b.OpenExecutable(bin)
+	if err != nil {
+		return
+	}
+	uprobe, err := ex.Uprobe("", b.objs.OnEntryGolang, &link.UprobeOptions{Offset: offset})
+	if err != nil {
+		return err
+	}
+	b.closers = append(b.closers, uprobe)
+	return
+}
+
+func (b *BPF) AttachRet(bin string, offset uint64) (err error) {
+	ex, err := b.OpenExecutable(bin)
+	if err != nil {
+		return
+	}
+	uprobe, err := ex.Uprobe("", b.objs.OnExitGolang, &link.UprobeOptions{Offset: offset})
 	if err != nil {
 		return err
 	}

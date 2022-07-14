@@ -26,7 +26,7 @@ func New(bin string) (_ *SymParser, err error) {
 	}, nil
 }
 
-func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprobe, err error) {
+func (p *SymParser) ParseUprobes(wildcards []string, depth int, golang bool) (uprobes []Uprobe, err error) {
 	funcnames, err := p.findMatchedFunctions(wildcards)
 	if err != nil {
 		return
@@ -64,31 +64,45 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 		}
 	}
 
-	for funcname := range allFuncnameSet {
-		entry, exits, err := p.findEntryExitOffsets(funcname)
-		if err != nil {
-			if errors.Is(err, DIENotFoundError) || errors.Is(err, FramePointerNotFound) || errors.Is(err, ReturnNotFound) || errors.Is(err, SymbolNotFoundError) {
+	if golang {
+		for funcname := range allFuncnameSet {
+			entry, exits, err := p.findEntryExitOffsets(funcname)
+			if err != nil {
 				log.Warnf("failed to get uprobe: %s", err)
 				continue
 			}
-			return nil, err
-		}
-		_, root := oriFuncnameSet[funcname]
-		uprobes = append(uprobes, Uprobe{
-			Funcname: funcname,
-			Location: AtEntry,
-			Offset:   entry,
-			Root:     root,
-		})
-		log.Debugf("add uprobe %s entry: %d", funcname, entry)
-		for _, exit := range exits {
+			_, root := oriFuncnameSet[funcname]
 			uprobes = append(uprobes, Uprobe{
 				Funcname: funcname,
-				Location: AtExit,
-				Offset:   exit,
+				Location: AtFramePointer,
+				Offset:   entry,
+				Root:     root,
+			})
+			log.Debugf("add uprobe %s entry: %d", funcname, entry)
+			for _, exit := range exits {
+				uprobes = append(uprobes, Uprobe{
+					Funcname: funcname,
+					Location: AtRet,
+					Offset:   exit,
+				})
+			}
+			log.Debugf("add uprobe %s exits: %v", funcname, exits)
+		}
+	} else {
+		for funcname := range allFuncnameSet {
+			offset, err := p.findSymbolOffset(funcname)
+			if err != nil {
+				log.Warnf("failed to get uprobe: %s", err)
+				continue
+			}
+			_, root := oriFuncnameSet[funcname]
+			uprobes = append(uprobes, Uprobe{
+				Funcname: funcname,
+				Location: AtEntry,
+				Offset:   offset,
+				Root:     root,
 			})
 		}
-		log.Debugf("add uprobe %s exits: %v", funcname, exits)
 	}
 
 	return

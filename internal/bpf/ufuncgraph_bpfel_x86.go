@@ -14,7 +14,7 @@ import (
 )
 
 type UfuncgraphEvent struct {
-	Goid       uint64
+	StackId    uint64
 	CallerIp   uint64
 	Ip         uint64
 	TimeNs     uint64
@@ -65,8 +65,10 @@ type UfuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphProgramSpecs struct {
-	OnEntry *ebpf.ProgramSpec `ebpf:"on_entry"`
-	OnExit  *ebpf.ProgramSpec `ebpf:"on_exit"`
+	OnEntry       *ebpf.ProgramSpec `ebpf:"on_entry"`
+	OnEntryGolang *ebpf.ProgramSpec `ebpf:"on_entry_golang"`
+	OnExit        *ebpf.ProgramSpec `ebpf:"on_exit"`
+	OnExitGolang  *ebpf.ProgramSpec `ebpf:"on_exit_golang"`
 }
 
 // UfuncgraphMapSpecs contains maps before they are loaded into the kernel.
@@ -114,14 +116,18 @@ func (m *UfuncgraphMaps) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphPrograms struct {
-	OnEntry *ebpf.Program `ebpf:"on_entry"`
-	OnExit  *ebpf.Program `ebpf:"on_exit"`
+	OnEntry       *ebpf.Program `ebpf:"on_entry"`
+	OnEntryGolang *ebpf.Program `ebpf:"on_entry_golang"`
+	OnExit        *ebpf.Program `ebpf:"on_exit"`
+	OnExitGolang  *ebpf.Program `ebpf:"on_exit_golang"`
 }
 
 func (p *UfuncgraphPrograms) Close() error {
 	return _UfuncgraphClose(
 		p.OnEntry,
+		p.OnEntryGolang,
 		p.OnExit,
+		p.OnExitGolang,
 	)
 }
 
