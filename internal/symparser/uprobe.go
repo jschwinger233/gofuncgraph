@@ -9,8 +9,8 @@ const (
 )
 
 type Uprobe struct {
-	Funcname      string
-	Location      UprobeLocation
-	Offset        uint64
-	UserSpecified bool
+	Funcname                 string
+	Location                 UprobeLocation
+	Offset                   uint64
+	UserSpecified, Backtrace bool
 }

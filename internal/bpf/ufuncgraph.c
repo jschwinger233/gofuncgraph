@@ -4,6 +4,7 @@
 #include "bpf_tracing.h"
 
 #define MAX_STACK_LAYERS 1000
+#define MAX_BT_LAYERS 50
 
 #define ENTPOINT 0
 #define RETPOINT 1
@@ -17,10 +18,10 @@ struct event {
     __u64 caller_ip;
     __u64 ip;
     __u64 time_ns;
-    __u32 stack_depth;
-    __u16 location;
-    __u16 errno;
-    __u8 args[104];
+    __u16 stack_depth;
+    __u8 location;
+    __u8 errno;
+    __u8 bt[MAX_BT_LAYERS*8];
 };
 
 // force emitting struct event into the ELF.
@@ -40,6 +41,13 @@ struct bpf_map_def SEC("maps") event_queue = {
     .max_entries = 1000000,
 };
 
+struct bpf_map_def SEC("maps") bpf_stack = {
+    .type = BPF_MAP_TYPE_PERCPU_ARRAY,
+    .key_size = sizeof(__u32),
+    .value_size = sizeof(struct event),
+    .max_entries = 1,
+};
+
 // goids is for stack_id generation
 struct bpf_map_def SEC("maps") goids = {
     .type = BPF_MAP_TYPE_PERCPU_ARRAY,
@@ -48,7 +56,7 @@ struct bpf_map_def SEC("maps") goids = {
     .max_entries = 1,
 };
 
-void static backtrace(__u64 bp, struct stackwalk *walk) {
+void static backtrace(__u64 bp, struct stackwalk *walk, __u8 *bt_data, __u8 bt) {
     for (walk->depth = 0; walk->depth < MAX_STACK_LAYERS; walk->depth++) {
         if (bpf_probe_read_user(&walk->stack_id, sizeof(walk->stack_id), (void*)bp) < 0) {
             walk->stack_id = bp;
@@ -56,6 +64,10 @@ void static backtrace(__u64 bp, struct stackwalk *walk) {
         }
         walk->root_bp = bp;
         bp = walk->stack_id;
+        if (bt == 1 && walk->depth < MAX_BT_LAYERS) {
+            if (bpf_probe_read_user(bt_data + walk->depth*8, sizeof(__u8)*8, (void*)bp+8) < 0)
+                return;
+        }
     }
     walk->depth = 0xffffffffffffffff;
     return;
@@ -71,73 +83,88 @@ __u64 static new_stack_id() {
     return (*stack_id) | ((__u64)cpu << 32);
 }
 
-SEC("uprobe/entpoint")
-int entpoint(struct pt_regs *ctx) {
-    struct event this_event;
-    __builtin_memset(&this_event, 0, sizeof(this_event));
+int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
+    __u32 key = 0;
+    struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
+    if (!e)
+        return 0; // should not happen
+    __builtin_memset(e, 0, sizeof(*e));
 
     // manipulate bpf inst
     //void *a, *b;
     //bpf_probe_read_user(&a, sizeof(a), (void*)ctx->rax+8);
     //bpf_probe_read_user(&b, sizeof(b), (void*)a);
-    //__builtin_memcpy(&this_event.args, &b, sizeof(b));
+    //__builtin_memcpy(&e.data, &b, sizeof(b));
     // manipulation ends
 
     __u64 this_bp = ctx->rbp;
-    this_event.location = ENTPOINT;
-    this_event.ip = ctx->rip;
-    bpf_probe_read_user(&this_event.caller_ip, sizeof(this_event.caller_ip), (void*)ctx->rbp+8);
-    this_event.time_ns = bpf_ktime_get_ns();
+    e->location = ENTPOINT;
+    e->ip = ctx->rip;
+    bpf_probe_read_user(&e->caller_ip, sizeof(e->caller_ip), (void*)ctx->rbp+8);
+    e->time_ns = bpf_ktime_get_ns();
 
     __u64 caller_bp;
     bpf_probe_read_user(&caller_bp, sizeof(caller_bp), (void*)ctx->rbp);
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
-    backtrace(ctx->rbp, &walk);
-    this_event.stack_depth = walk.depth;
-    this_event.stack_id = walk.stack_id;
+    backtrace(ctx->rbp, &walk, e->bt, bt);
+    e->stack_depth = walk.depth;
+    e->stack_id = walk.stack_id;
     if (walk.depth == 0xffffffffffffffff) {
-        this_event.errno = STACKOVERFLOWERR;
+        e->errno = STACKOVERFLOWERR;
         goto submit_event;
     }
 
-    if (this_event.stack_id == 0) {
-        this_event.stack_id = new_stack_id();
-        bpf_probe_write_user((void*)walk.root_bp, &this_event.stack_id, sizeof(this_event.stack_id));
+    if (e->stack_id == 0) {
+        e->stack_id = new_stack_id();
+        bpf_probe_write_user((void*)walk.root_bp, &e->stack_id, sizeof(e->stack_id));
         goto submit_event;
     }
 
 submit_event:
-    bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
+    bpf_map_push_elem(&event_queue, e, BPF_EXIST);
     return 0;
+}
+
+SEC("uprobe/entpoint_with_bt")
+int entpoint_with_bt(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 1);
+}
+
+SEC("uprobe/entpoint")
+int entpoint(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 0);
 }
 
 SEC("uprobe/retpoint")
 int retpoint(struct pt_regs *ctx) {
-    struct event this_event;
-    __builtin_memset(&this_event, 0, sizeof(this_event));
-    this_event.location = RETPOINT;
-    this_event.ip = ctx->rip;
-    this_event.time_ns = bpf_ktime_get_ns();
+    __u32 key = 0;
+    struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
+    if (!e)
+        return 0; // should not happen
+    __builtin_memset(e, 0, sizeof(*e));
+    e->location = RETPOINT;
+    e->ip = ctx->rip;
+    e->time_ns = bpf_ktime_get_ns();
 
     __u64 this_bp = ctx->rsp - 8;
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
-    backtrace(this_bp, &walk);
-    this_event.stack_depth = walk.depth;
-    this_event.stack_id = walk.stack_id;
+    backtrace(this_bp, &walk, NULL, 0);
+    e->stack_depth = walk.depth;
+    e->stack_id = walk.stack_id;
     if (walk.depth == 0xffffffffffffffff) {
-        this_event.errno = STACKOVERFLOWERR;
+        e->errno = STACKOVERFLOWERR;
         goto submit_event;
     }
 
-    if (this_event.stack_id == 0) {
+    if (e->stack_id == 0) {
         return 0; // dangling exit, do nothing
     }
 
 submit_event:
-    bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
+    bpf_map_push_elem(&event_queue, e, BPF_EXIST);
     return 0;
 }

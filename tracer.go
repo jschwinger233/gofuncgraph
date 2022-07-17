@@ -14,7 +14,7 @@ import (
 type Tracer struct {
 	bin       string
 	wildcards []string
-	back      bool
+	backtrace bool
 	depth     int
 
 	bpf       *bpf.BPF
@@ -33,7 +33,7 @@ func NewTracer(bin string, wildcards []string, backtrace bool, depth int) (_ *Tr
 	return &Tracer{
 		bin:       bin,
 		wildcards: wildcards,
-		back:      backtrace,
+		backtrace: backtrace,
 		depth:     depth,
 
 		bpf:       bpf,
@@ -42,7 +42,7 @@ func NewTracer(bin string, wildcards []string, backtrace bool, depth int) (_ *Tr
 }
 
 func (t *Tracer) Start() (err error) {
-	uprobes, err := t.symParser.ParseUprobes(t.wildcards, t.depth)
+	uprobes, err := t.symParser.ParseUprobes(t.wildcards, t.depth, t.backtrace)
 	if err != nil {
 		return
 	}

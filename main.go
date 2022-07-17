@@ -23,7 +23,7 @@ func main() {
 		Name: "utrace",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "back",
+				Name:    "backtrace",
 				Aliases: []string{"b"},
 				Value:   false,
 				Usage:   "backtrace, show the stack chains",
@@ -47,11 +47,11 @@ func main() {
 			return nil
 		},
 		Action: func(ctx *cli.Context) (err error) {
-			back, depth := ctx.Bool("back"), ctx.Int("depth")
+			backtrace, depth := ctx.Bool("backtrace"), ctx.Int("depth")
 			bin := ctx.Args().First()
 			wildcards := ctx.Args().Tail()
 
-			tracer, err := NewTracer(bin, wildcards, back, depth)
+			tracer, err := NewTracer(bin, wildcards, backtrace, depth)
 			if err != nil {
 				return
 			}

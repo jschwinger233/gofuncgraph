@@ -18,10 +18,11 @@ type UfuncgraphEvent struct {
 	CallerIp   uint64
 	Ip         uint64
 	TimeNs     uint64
-	StackDepth uint32
-	Location   uint16
-	Errno      uint16
-	Args       [104]uint8
+	StackDepth uint16
+	Location   uint8
+	Errno      uint8
+	Bt         [400]uint8
+	_          [4]byte
 }
 
 // LoadUfuncgraph returns the embedded CollectionSpec for Ufuncgraph.
@@ -65,14 +66,16 @@ type UfuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphProgramSpecs struct {
-	Entpoint *ebpf.ProgramSpec `ebpf:"entpoint"`
-	Retpoint *ebpf.ProgramSpec `ebpf:"retpoint"`
+	Entpoint       *ebpf.ProgramSpec `ebpf:"entpoint"`
+	EntpointWithBt *ebpf.ProgramSpec `ebpf:"entpoint_with_bt"`
+	Retpoint       *ebpf.ProgramSpec `ebpf:"retpoint"`
 }
 
 // UfuncgraphMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphMapSpecs struct {
+	BpfStack   *ebpf.MapSpec `ebpf:"bpf_stack"`
 	EventQueue *ebpf.MapSpec `ebpf:"event_queue"`
 	Goids      *ebpf.MapSpec `ebpf:"goids"`
 }
@@ -96,12 +99,14 @@ func (o *UfuncgraphObjects) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphMaps struct {
+	BpfStack   *ebpf.Map `ebpf:"bpf_stack"`
 	EventQueue *ebpf.Map `ebpf:"event_queue"`
 	Goids      *ebpf.Map `ebpf:"goids"`
 }
 
 func (m *UfuncgraphMaps) Close() error {
 	return _UfuncgraphClose(
+		m.BpfStack,
 		m.EventQueue,
 		m.Goids,
 	)
@@ -111,13 +116,15 @@ func (m *UfuncgraphMaps) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphPrograms struct {
-	Entpoint *ebpf.Program `ebpf:"entpoint"`
-	Retpoint *ebpf.Program `ebpf:"retpoint"`
+	Entpoint       *ebpf.Program `ebpf:"entpoint"`
+	EntpointWithBt *ebpf.Program `ebpf:"entpoint_with_bt"`
+	Retpoint       *ebpf.Program `ebpf:"retpoint"`
 }
 
 func (p *UfuncgraphPrograms) Close() error {
 	return _UfuncgraphClose(
 		p.Entpoint,
+		p.EntpointWithBt,
 		p.Retpoint,
 	)
 }

@@ -44,6 +44,9 @@ func (b *BPF) Attach(bin string, uprobes []symparser.Uprobe) (err error) {
 		switch uprobe.Location {
 		case symparser.AtFramePointer:
 			prog = b.objs.Entpoint
+			if uprobe.Backtrace {
+				prog = b.objs.EntpointWithBt
+			}
 		case symparser.AtRet:
 			prog = b.objs.Retpoint
 		}

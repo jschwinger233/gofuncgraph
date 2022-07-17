@@ -25,7 +25,7 @@ func New(bin string) (_ *SymParser, err error) {
 	}, nil
 }
 
-func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprobe, err error) {
+func (p *SymParser) ParseUprobes(wildcards []string, depth int, backtrace bool) (uprobes []Uprobe, err error) {
 	var include, exclude []string
 	for _, wc := range wildcards {
 		if wc[0] == '!' {
@@ -95,8 +95,9 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 			Location:      AtFramePointer,
 			Offset:        fpOffset,
 			UserSpecified: userSpecified,
+			Backtrace:     userSpecified && backtrace,
 		})
-		log.Debugf("added uprobe %s at framepointor: %d", funcname, fpOffset)
+		log.Infof("added uprobe %s at framepointor: %d", funcname, fpOffset)
 		for _, off := range retOffsets {
 			uprobes = append(uprobes, Uprobe{
 				Funcname: funcname,
@@ -104,7 +105,7 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 				Offset:   off,
 			})
 		}
-		log.Debugf("added uprobe %s at ret: %v", funcname, retOffsets)
+		log.Infof("added uprobe %s at ret: %v", funcname, retOffsets)
 	}
 
 	return
