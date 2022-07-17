@@ -8,15 +8,17 @@ import (
 	"github.com/go-delve/delve/pkg/dwarf/godwarf"
 )
 
-type ELFFile struct {
-	binPath   string
+type ELF struct {
+	bin       string
 	binFile   *os.File
 	elfFile   *elf.File
 	dwarfData *dwarf.Data
+
+	cache map[string]interface{}
 }
 
-func New(binPath string) (_ *ELFFile, err error) {
-	binFile, err := os.Open(binPath)
+func New(bin string) (_ *ELF, err error) {
+	binFile, err := os.Open(bin)
 	if err != nil {
 		return
 	}
@@ -62,10 +64,11 @@ func New(binPath string) (_ *ELFFile, err error) {
 	if err != nil {
 		return
 	}
-	return &ELFFile{
-		binPath:   binPath,
+	return &ELF{
+		bin:       bin,
 		binFile:   binFile,
 		elfFile:   elfFile,
 		dwarfData: dwarfData,
+		cache:     map[string]interface{}{},
 	}, nil
 }

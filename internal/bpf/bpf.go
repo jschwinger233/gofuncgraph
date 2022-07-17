@@ -2,10 +2,10 @@ package bpf
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/jschwinger233/ufuncgraph/internal/symparser"
 )
@@ -35,84 +35,25 @@ func (b *BPF) Load() (err error) {
 }
 
 func (b *BPF) Attach(bin string, uprobes []symparser.Uprobe) (err error) {
+	ex, err := link.OpenExecutable(bin)
+	if err != nil {
+		return
+	}
 	for _, uprobe := range uprobes {
+		var prog *ebpf.Program
 		switch uprobe.Location {
-		case symparser.AtEntry:
-			err = b.AttachUprobe(bin, uprobe.Offset)
-			if err == nil {
-				err = b.AttachUretprobe(bin, uprobe.Offset)
-			}
-		case symparser.AtRet:
-			err = b.AttachRet(bin, uprobe.Offset)
 		case symparser.AtFramePointer:
-			err = b.AttachFramePointer(bin, uprobe.Offset)
+			prog = b.objs.Entpoint
+		case symparser.AtRet:
+			prog = b.objs.Retpoint
 		}
+		uprobe, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: uprobe.Offset})
 		if err != nil {
-			return
+			return err
 		}
-	}
-	return
-}
+		b.closers = append(b.closers, uprobe)
 
-func (b *BPF) OpenExecutable(bin string) (_ *link.Executable, err error) {
-	if _, ok := b.executables[bin]; !ok {
-		if b.executables[bin], err = link.OpenExecutable(bin); err != nil {
-			return
-		}
 	}
-	return b.executables[bin], nil
-}
-
-func (b *BPF) AttachUprobe(bin string, offset uint64) (err error) {
-	ex, err := b.OpenExecutable(bin)
-	if err != nil {
-		return
-	}
-	uprobe, err := ex.Uprobe("", b.objs.OnEntry, &link.UprobeOptions{Offset: offset})
-	if err != nil {
-		return err
-	}
-	b.closers = append(b.closers, uprobe)
-	return
-}
-
-func (b *BPF) AttachUretprobe(bin string, offset uint64) (err error) {
-	ex, err := b.OpenExecutable(bin)
-	if err != nil {
-		return
-	}
-	fmt.Printf("uretprobe: %x\n", offset)
-	uprobe, err := ex.Uretprobe("", b.objs.OnExit, &link.UprobeOptions{Offset: offset})
-	if err != nil {
-		return err
-	}
-	b.closers = append(b.closers, uprobe)
-	return
-}
-
-func (b *BPF) AttachFramePointer(bin string, offset uint64) (err error) {
-	ex, err := b.OpenExecutable(bin)
-	if err != nil {
-		return
-	}
-	uprobe, err := ex.Uprobe("", b.objs.OnEntryGolang, &link.UprobeOptions{Offset: offset})
-	if err != nil {
-		return err
-	}
-	b.closers = append(b.closers, uprobe)
-	return
-}
-
-func (b *BPF) AttachRet(bin string, offset uint64) (err error) {
-	ex, err := b.OpenExecutable(bin)
-	if err != nil {
-		return
-	}
-	uprobe, err := ex.Uprobe("", b.objs.OnExitGolang, &link.UprobeOptions{Offset: offset})
-	if err != nil {
-		return err
-	}
-	b.closers = append(b.closers, uprobe)
 	return
 }
 

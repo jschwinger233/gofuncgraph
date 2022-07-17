@@ -3,8 +3,13 @@
 #include "common.h"
 #include "bpf_tracing.h"
 
-#define MAX_STACK_LAYERS 5000
+#define MAX_STACK_LAYERS 1000
 #define MAX_GOROUTINES 1000
+
+#define ENTPOINT 0
+#define RETPOINT 1
+
+#define STACKOVERFLOWERR 1
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
@@ -14,8 +19,8 @@ struct event {
     __u64 ip;
     __u64 time_ns;
     __u32 stack_depth;
-    __u16 hook_point; // 0 entry; 1 exit;
-    __u16 errno; // 0 no error; 1 root bp; 2 stackoverflow;
+    __u16 location;
+    __u16 errno;
     __u8 args[104];
 };
 
@@ -75,8 +80,8 @@ __u64 static new_stack_id() {
     return (*stack_id) | ((__u64)cpu << 32);
 }
 
-SEC("uprobe/on_entry_golang")
-int on_entry_golang(struct pt_regs *ctx) {
+SEC("uprobe/entpoint")
+int entpoint(struct pt_regs *ctx) {
     struct event this_event;
     __builtin_memset(&this_event, 0, sizeof(this_event));
 
@@ -88,7 +93,7 @@ int on_entry_golang(struct pt_regs *ctx) {
     // manipulation ends
 
     __u64 this_bp = ctx->rbp;
-    this_event.hook_point = 0;
+    this_event.location = ENTPOINT;
     this_event.ip = ctx->rip;
     bpf_probe_read_user(&this_event.caller_ip, sizeof(this_event.caller_ip), (void*)ctx->rbp+8);
     this_event.time_ns = bpf_ktime_get_ns();
@@ -108,7 +113,7 @@ int on_entry_golang(struct pt_regs *ctx) {
     this_event.stack_depth = walk.depth;
     this_event.stack_id = walk.stack_id;
     if (walk.depth == 0xffffffffffffffff) {
-        this_event.errno = 2;
+        this_event.errno = STACKOVERFLOWERR;
         goto submit_event;
     }
 
@@ -124,11 +129,11 @@ submit_event:
     return 0;
 }
 
-SEC("uprobe/on_exit_golang")
-int on_exit_golang(struct pt_regs *ctx) {
+SEC("uprobe/retpoint")
+int retpoint(struct pt_regs *ctx) {
     struct event this_event;
     __builtin_memset(&this_event, 0, sizeof(this_event));
-    this_event.hook_point = 1;
+    this_event.location = RETPOINT;
     this_event.ip = ctx->rip;
     this_event.time_ns = bpf_ktime_get_ns();
 
@@ -146,7 +151,7 @@ int on_exit_golang(struct pt_regs *ctx) {
     this_event.stack_depth = walk.depth;
     this_event.stack_id = walk.stack_id;
     if (walk.depth == 0xffffffffffffffff) {
-        this_event.errno = 2;
+        this_event.errno = STACKOVERFLOWERR;
         goto submit_event;
     }
 
@@ -157,54 +162,5 @@ int on_exit_golang(struct pt_regs *ctx) {
 submit_event:
     bpf_map_delete_elem(&bp_to_event, &this_bp);
     bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
-    return 0;
-}
-
-SEC("uprobe/on_entry")
-int on_entry(struct pt_regs *ctx) {
-    struct event this_event;
-    __builtin_memset(&this_event, 0, sizeof(this_event));
-    this_event.hook_point = 0;
-    this_event.ip = ctx->rip;
-    bpf_probe_read_user(&this_event.caller_ip, sizeof(this_event.caller_ip), (void*)ctx->rsp);
-    this_event.time_ns = bpf_ktime_get_ns();
-
-    __u64 this_bp = ctx->rsp - 8;
-    bpf_printk("enter %llx, this bp %llx\n", ctx->rsp, this_bp);
-    __u64 caller_bp = ctx->rbp;
-    struct event *caller_event = bpf_map_lookup_elem(&bp_to_event, &caller_bp);
-    if (caller_event) {
-        this_event.stack_id = caller_event->stack_id;
-        this_event.stack_depth = caller_event->stack_depth + 1;
-        goto submit_event;
-    }
-
-    this_event.stack_id = new_stack_id();
-
-submit_event:
-    bpf_map_update_elem(&bp_to_event, &this_bp, &this_event, BPF_ANY);
-    bpf_printk("push event, depth %d, ip %lld, caller bp %lld\n", this_event.stack_depth, this_event.ip, caller_bp);
-    bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
-    return 0;
-}
-
-SEC("uretprobe/on_exit")
-int on_exit(struct pt_regs *ctx) {
-    struct event this_event;
-    __builtin_memset(&this_event, 0, sizeof(this_event));
-    this_event.hook_point = 1;
-    this_event.time_ns = bpf_ktime_get_ns();
-
-    __u64 this_bp = ctx->rsp - 16;
-    bpf_printk("return %llx, this bp %llx\n", ctx->rsp, this_bp);
-    struct event *entry_event = bpf_map_lookup_elem(&bp_to_event, &this_bp);
-    if (entry_event) {
-        this_event.stack_id = entry_event->stack_id;
-        this_event.stack_depth = entry_event->stack_depth;
-        bpf_map_delete_elem(&bp_to_event, &this_bp);
-        bpf_printk("push event\n");
-        bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
-    }
-
     return 0;
 }
