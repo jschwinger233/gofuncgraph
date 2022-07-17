@@ -4,7 +4,7 @@
 #include "bpf_tracing.h"
 
 #define MAX_STACK_LAYERS 1000
-#define MAX_GOROUTINES 1000
+#define MAX_BP_CACHE 10
 
 #define ENTPOINT 0
 #define RETPOINT 1
@@ -54,7 +54,7 @@ struct bpf_map_def SEC("maps") bp_to_event = {
     .type = BPF_MAP_TYPE_LRU_HASH,
     .key_size = sizeof(__u64),
     .value_size = sizeof(struct event),
-    .max_entries = MAX_GOROUTINES,
+    .max_entries = MAX_BP_CACHE,
 };
 
 void static backtrace(__u64 bp, struct stackwalk *walk) {

@@ -2,6 +2,7 @@ package symparser
 
 import (
 	"github.com/jschwinger233/ufuncgraph/elf"
+	"github.com/jschwinger233/ufuncgraph/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,7 +26,15 @@ func New(bin string) (_ *SymParser, err error) {
 }
 
 func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprobe, err error) {
-	funcnames, err := p.FuncnamesMatchedWildcards(wildcards)
+	var include, exclude []string
+	for _, wc := range wildcards {
+		if wc[0] == '!' {
+			exclude = append(exclude, wc[1:])
+		} else {
+			include = append(include, wc)
+		}
+	}
+	funcnames, err := p.FuncnamesMatchedWildcards(include)
 	if err != nil {
 		return
 	}
@@ -60,6 +69,16 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int) (uprobes []Uprob
 	}
 
 	for funcname := range allFuncnameSet {
+		excluded := false
+		for _, wc := range exclude {
+			if utils.MatchWildcard(wc, funcname) {
+				excluded = true
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
 		fpOffset, err := p.FuncFramePointerOffset(funcname)
 		if err != nil {
 			log.Warnf("failed to get entpoint: %s", err)
