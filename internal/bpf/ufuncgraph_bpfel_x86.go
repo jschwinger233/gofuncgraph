@@ -73,7 +73,6 @@ type UfuncgraphProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphMapSpecs struct {
-	BpToEvent  *ebpf.MapSpec `ebpf:"bp_to_event"`
 	EventQueue *ebpf.MapSpec `ebpf:"event_queue"`
 	Goids      *ebpf.MapSpec `ebpf:"goids"`
 }
@@ -97,14 +96,12 @@ func (o *UfuncgraphObjects) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphMaps struct {
-	BpToEvent  *ebpf.Map `ebpf:"bp_to_event"`
 	EventQueue *ebpf.Map `ebpf:"event_queue"`
 	Goids      *ebpf.Map `ebpf:"goids"`
 }
 
 func (m *UfuncgraphMaps) Close() error {
 	return _UfuncgraphClose(
-		m.BpToEvent,
 		m.EventQueue,
 		m.Goids,
 	)

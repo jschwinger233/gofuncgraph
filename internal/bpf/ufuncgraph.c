@@ -4,7 +4,6 @@
 #include "bpf_tracing.h"
 
 #define MAX_STACK_LAYERS 1000
-#define MAX_BP_CACHE 10
 
 #define ENTPOINT 0
 #define RETPOINT 1
@@ -47,14 +46,6 @@ struct bpf_map_def SEC("maps") goids = {
     .key_size = sizeof(__u32),
     .value_size = sizeof(__u64),
     .max_entries = 1,
-};
-
-// bp_to_event is for looking up the caller event
-struct bpf_map_def SEC("maps") bp_to_event = {
-    .type = BPF_MAP_TYPE_LRU_HASH,
-    .key_size = sizeof(__u64),
-    .value_size = sizeof(struct event),
-    .max_entries = MAX_BP_CACHE,
 };
 
 void static backtrace(__u64 bp, struct stackwalk *walk) {
@@ -100,12 +91,6 @@ int entpoint(struct pt_regs *ctx) {
 
     __u64 caller_bp;
     bpf_probe_read_user(&caller_bp, sizeof(caller_bp), (void*)ctx->rbp);
-    struct event *caller_event = bpf_map_lookup_elem(&bp_to_event, &caller_bp);
-    if (caller_event) {
-        this_event.stack_id = caller_event->stack_id;
-        this_event.stack_depth = caller_event->stack_depth + 1;
-        goto submit_event;
-    }
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
@@ -124,7 +109,6 @@ int entpoint(struct pt_regs *ctx) {
     }
 
 submit_event:
-    bpf_map_update_elem(&bp_to_event, &this_bp, &this_event, BPF_ANY);
     bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
     return 0;
 }
@@ -138,12 +122,6 @@ int retpoint(struct pt_regs *ctx) {
     this_event.time_ns = bpf_ktime_get_ns();
 
     __u64 this_bp = ctx->rsp - 8;
-    struct event *entry_event = bpf_map_lookup_elem(&bp_to_event, &this_bp);
-    if (entry_event) {
-        this_event.stack_id = entry_event->stack_id;
-        this_event.stack_depth = entry_event->stack_depth;
-        goto submit_event;
-    }
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
@@ -160,7 +138,6 @@ int retpoint(struct pt_regs *ctx) {
     }
 
 submit_event:
-    bpf_map_delete_elem(&bp_to_event, &this_bp);
     bpf_map_push_elem(&event_queue, &this_event, BPF_EXIST);
     return 0;
 }
