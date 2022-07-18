@@ -1,9 +1,10 @@
 package symparser
 
 import (
+	"fmt"
+
 	"github.com/jschwinger233/ufuncgraph/elf"
 	"github.com/jschwinger233/ufuncgraph/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 type SymParser struct {
@@ -26,87 +27,86 @@ func New(bin string) (_ *SymParser, err error) {
 }
 
 func (p *SymParser) ParseUprobes(wildcards []string, depth int, backtrace bool) (uprobes []Uprobe, err error) {
-	var include, exclude []string
+	var includes, excludes []string
 	for _, wc := range wildcards {
 		if wc[0] == '!' {
-			exclude = append(exclude, wc[1:])
+			excludes = append(excludes, wc[1:])
 		} else {
-			include = append(include, wc)
+			includes = append(includes, wc)
 		}
 	}
-	funcnames, err := p.FuncnamesMatchedWildcards(include)
+
+	funcnames, err := p.FuncnamesMatchedWildcards(includes)
 	if err != nil {
 		return
 	}
 
-	allFuncnameSet := map[string]interface{}{}
-	oriFuncnameSet := map[string]interface{}{}
+	trees := []*FuncTree{}
 	for _, funcname := range funcnames {
-		allFuncnameSet[funcname] = nil
-		oriFuncnameSet[funcname] = nil
+		trees = append(trees, p.ParseFuncTree(funcname, depth, excludes))
 	}
 
-	searched := map[string]interface{}{}
-	toSearch := make([]string, len(oriFuncnameSet))
-	copy(toSearch, funcnames)
-	for d := 0; d < depth; d++ {
-		searching := make([]string, len(toSearch))
-		copy(searching, toSearch)
-		toSearch = []string{}
-		for _, funcname := range searching {
-			searched[funcname] = nil
-			funcnames, err := p.FuncCalledBy(funcname)
-			if err != nil {
-				continue
+	visited := map[string]interface{}{}
+	for _, tree := range trees {
+		tree.Print(0)
+		tree.Traverse(func(layer int, parent, self *FuncTree) bool {
+			if _, ok := visited[self.Name]; ok {
+				return false
 			}
-			for _, name := range funcnames {
-				allFuncnameSet[name] = nil
-				if _, ok := searched[name]; !ok {
-					toSearch = append(toSearch, name)
-				}
-			}
-		}
-	}
+			visited[self.Name] = nil
 
-	for funcname := range allFuncnameSet {
-		excluded := false
-		for _, wc := range exclude {
-			if utils.MatchWildcard(wc, funcname) {
-				excluded = true
-				break
+			if self.Err != nil {
+				return true
 			}
-		}
-		if excluded {
-			continue
-		}
-		fpOffset, err := p.FuncFramePointerOffset(funcname)
-		if err != nil {
-			log.Warnf("failed to get entpoint: %s", err)
-			continue
-		}
-		retOffsets, err := p.FuncRetOffsets(funcname)
-		if err != nil {
-			log.Warnf("failed to get retpoints: %s", err)
-			continue
-		}
-		_, userSpecified := oriFuncnameSet[funcname]
-		uprobes = append(uprobes, Uprobe{
-			Funcname:      funcname,
-			Location:      AtFramePointer,
-			Offset:        fpOffset,
-			UserSpecified: userSpecified,
-			Backtrace:     userSpecified && backtrace,
-		})
-		log.Infof("added uprobe %s at framepointor: %d", funcname, fpOffset)
-		for _, off := range retOffsets {
+
+			userSpecified := layer == 0
 			uprobes = append(uprobes, Uprobe{
-				Funcname: funcname,
-				Location: AtRet,
-				Offset:   off,
+				Funcname:      self.Name,
+				Location:      AtFramePointer,
+				Offset:        self.FpOffset,
+				UserSpecified: userSpecified,
+				Backtrace:     userSpecified && backtrace,
 			})
-		}
-		log.Infof("added uprobe %s at ret: %v", funcname, retOffsets)
+			for _, off := range self.RetOffsets {
+				uprobes = append(uprobes, Uprobe{
+					Funcname: self.Name,
+					Location: AtRet,
+					Offset:   off,
+				})
+			}
+			return true
+		})
 	}
 
+	return
+}
+
+func (p *SymParser) ParseFuncTree(name string, depth int, excludes []string) (tree *FuncTree) {
+	tree = &FuncTree{Name: name}
+	funcnames, err := p.FuncCalledBy(name)
+	if err != nil {
+		tree.Err = err
+		return
+	}
+	tree.FpOffset, tree.Err = p.FuncFramePointerOffset(name)
+	if tree.Err != nil {
+		return
+	}
+	tree.RetOffsets, tree.Err = p.FuncRetOffsets(name)
+	if tree.Err != nil {
+		return
+	}
+	for _, wc := range excludes {
+		if utils.MatchWildcard(wc, name) {
+			tree.Err = fmt.Errorf("excluded by %s", wc)
+			break
+		}
+	}
+	if depth == 0 {
+		return
+	}
+	for _, funcname := range funcnames {
+		tree.Children = append(tree.Children, p.ParseFuncTree(funcname, depth-1, excludes))
+	}
 	return
 }

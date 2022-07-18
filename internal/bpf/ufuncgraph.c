@@ -64,10 +64,9 @@ void static backtrace(__u64 bp, struct stackwalk *walk, __u8 *bt_data, __u8 bt) 
         }
         walk->root_bp = bp;
         bp = walk->stack_id;
-        if (bt == 1 && walk->depth < MAX_BT_LAYERS) {
+        if (bt == 1 && walk->depth < MAX_BT_LAYERS)
             if (bpf_probe_read_user(bt_data + walk->depth*8, sizeof(__u8)*8, (void*)bp+8) < 0)
                 return;
-        }
     }
     walk->depth = 0xffffffffffffffff;
     return;
