@@ -22,7 +22,7 @@ type UfuncgraphEvent struct {
 	Location   uint8
 	Errno      uint8
 	Bt         [400]uint8
-	_          [4]byte
+	Data       [100]uint8
 }
 
 // LoadUfuncgraph returns the embedded CollectionSpec for Ufuncgraph.

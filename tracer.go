@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/jschwinger233/ufuncgraph/internal/bpf"
 	"github.com/jschwinger233/ufuncgraph/internal/eventmanager"
@@ -13,7 +15,7 @@ import (
 
 type Tracer struct {
 	bin       string
-	wildcards []string
+	args      []string
 	backtrace bool
 	depth     int
 
@@ -21,7 +23,7 @@ type Tracer struct {
 	symParser *symparser.SymParser
 }
 
-func NewTracer(bin string, wildcards []string, backtrace bool, depth int) (_ *Tracer, err error) {
+func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer, err error) {
 	bpf := bpf.New()
 	if err = bpf.Load(); err != nil {
 		return
@@ -32,7 +34,7 @@ func NewTracer(bin string, wildcards []string, backtrace bool, depth int) (_ *Tr
 	}
 	return &Tracer{
 		bin:       bin,
-		wildcards: wildcards,
+		args:      args,
 		backtrace: backtrace,
 		depth:     depth,
 
@@ -41,8 +43,58 @@ func NewTracer(bin string, wildcards []string, backtrace bool, depth int) (_ *Tr
 	}, nil
 }
 
+func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, err error) {
+	fetch = map[string]map[string]string{}
+	for _, input := range inputs {
+		if input[len(input)-1] == ')' {
+			stack := []byte{')'}
+			for i := len(input) - 2; i >= 0; i-- {
+				if input[i] == ')' {
+					stack = append(stack, ')')
+				} else if input[i] == '(' {
+					if len(stack) > 0 && stack[len(stack)-1] == ')' {
+						stack = stack[:len(stack)-1]
+					} else {
+						err = fmt.Errorf("imbalanced parenthese: %s", input)
+						return
+					}
+				}
+
+				if len(stack) == 0 {
+					funcname := input[:i]
+					fetch[funcname] = map[string]string{}
+					for _, part := range strings.Split(input[i+1:len(input)-1], ",") {
+						varState := strings.Split(part, "=")
+						if len(varState) != 2 {
+							err = fmt.Errorf("invalid variable statement: %s", varState)
+							return
+						}
+						fetch[funcname][strings.TrimSpace(varState[0])] = strings.TrimSpace(varState[1])
+					}
+					input = input[:i]
+					break
+				}
+			}
+			if len(stack) > 0 {
+				err = fmt.Errorf("imbalanced parenthese: %s", input)
+				return
+			}
+		}
+		if input[0] == '!' {
+			ex = append(ex, input[1:])
+		} else {
+			in = append(in, input)
+		}
+	}
+	return
+}
+
 func (t *Tracer) Start() (err error) {
-	uprobes, err := t.symParser.ParseUprobes(t.wildcards, t.depth, t.backtrace)
+	in, ex, fetch, err := t.ParseArgs(t.args)
+	if err != nil {
+		return
+	}
+	uprobes, err := t.symParser.ParseUprobes(in, ex, fetch, t.depth, t.backtrace)
 	if err != nil {
 		return
 	}

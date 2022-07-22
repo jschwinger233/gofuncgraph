@@ -26,24 +26,15 @@ func New(bin string) (_ *SymParser, err error) {
 	}, nil
 }
 
-func (p *SymParser) ParseUprobes(wildcards []string, depth int, backtrace bool) (uprobes []Uprobe, err error) {
-	var includes, excludes []string
-	for _, wc := range wildcards {
-		if wc[0] == '!' {
-			excludes = append(excludes, wc[1:])
-		} else {
-			includes = append(includes, wc)
-		}
-	}
-
-	funcnames, err := p.FuncnamesMatchedWildcards(includes)
+func (p *SymParser) ParseUprobes(in, ex []string, fetch map[string]map[string]string, depth int, backtrace bool) (uprobes []Uprobe, err error) {
+	funcnames, err := p.FuncnamesMatchedWildcards(in)
 	if err != nil {
 		return
 	}
 
 	trees := []*FuncTree{}
 	for _, funcname := range funcnames {
-		trees = append(trees, p.ParseFuncTree(funcname, depth, excludes))
+		trees = append(trees, p.ParseFuncTree(funcname, depth, ex))
 	}
 
 	visited := map[string]interface{}{}
@@ -54,7 +45,6 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int, backtrace bool) 
 				return false
 			}
 			visited[self.Name] = nil
-
 			if self.Err != nil {
 				return true
 			}
@@ -81,7 +71,7 @@ func (p *SymParser) ParseUprobes(wildcards []string, depth int, backtrace bool) 
 	return
 }
 
-func (p *SymParser) ParseFuncTree(name string, depth int, excludes []string) (tree *FuncTree) {
+func (p *SymParser) ParseFuncTree(name string, depth int, ex []string) (tree *FuncTree) {
 	tree = &FuncTree{Name: name}
 	funcnames, err := p.FuncCalledBy(name)
 	if err != nil {
@@ -96,7 +86,7 @@ func (p *SymParser) ParseFuncTree(name string, depth int, excludes []string) (tr
 	if tree.Err != nil {
 		return
 	}
-	for _, wc := range excludes {
+	for _, wc := range ex {
 		if utils.MatchWildcard(wc, name) {
 			tree.Err = fmt.Errorf("excluded by %s", wc)
 			break
@@ -106,7 +96,7 @@ func (p *SymParser) ParseFuncTree(name string, depth int, excludes []string) (tr
 		return
 	}
 	for _, funcname := range funcnames {
-		tree.Children = append(tree.Children, p.ParseFuncTree(funcname, depth-1, excludes))
+		tree.Children = append(tree.Children, p.ParseFuncTree(funcname, depth-1, ex))
 	}
 	return
 }

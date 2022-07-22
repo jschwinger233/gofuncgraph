@@ -13,5 +13,5 @@ type Uprobe struct {
 	Location                 UprobeLocation
 	Offset                   uint64
 	UserSpecified, Backtrace bool
-	FetchArgs                []string
+	FetchArgs                []FetchArg
 }

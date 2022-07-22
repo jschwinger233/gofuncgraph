@@ -49,9 +49,9 @@ func main() {
 		Action: func(ctx *cli.Context) (err error) {
 			backtrace, depth := ctx.Bool("backtrace"), ctx.Int("depth")
 			bin := ctx.Args().First()
-			wildcards := ctx.Args().Tail()
+			args := ctx.Args().Tail()
 
-			tracer, err := NewTracer(bin, wildcards, backtrace, depth)
+			tracer, err := NewTracer(bin, args, backtrace, depth)
 			if err != nil {
 				return
 			}
