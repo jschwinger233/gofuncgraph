@@ -37,6 +37,21 @@ func newFetchArg(varname, statement string) (_ *FetchArg, err error) {
 		err = fmt.Errorf("type not found: %s", statement)
 		return
 	}
+	switch parts[1][0] {
+	case 'u', 's':
+		if !(parts[1][1:] == "8" || parts[1][1:] == "16" || parts[1][1:] == "32" || parts[1][1:] == "64") {
+			err = fmt.Errorf("only support 8/16/32/64 bits for u/s type: %s", parts[1])
+			return
+		}
+	case 'c':
+		if !(parts[1][1:] == "8" || parts[1][1:] == "16" || parts[1][1:] == "32" || parts[1][1:] == "64" || parts[1][1:] == "128" || parts[1][1:] == "256") {
+			err = fmt.Errorf("only support 8/16/32/64/128/256 bits for c type: %s", parts[1])
+			return
+		}
+	default:
+		err = fmt.Errorf("only support u/s/c type: %s", parts[1])
+		return
+	}
 
 	targetSize, err := strconv.Atoi(parts[1][1:])
 	if err != nil {
@@ -104,9 +119,7 @@ type FetchOp interface {
 
 func newFetchOp(op string, size int) (_ FetchOp, err error) {
 	if len(op) != 0 && op[0] == '%' {
-		return &ReadReg{
-			register: op[1:],
-		}, nil
+		return newReadReg(op[1:])
 	}
 	offset, err := strconv.ParseInt(op, 10, 64)
 	if err != nil {
@@ -145,6 +158,15 @@ var RegisterR8Offsets map[string]int16 = map[string]int16{
 // ReadReg: %rsp
 type ReadReg struct {
 	register string
+}
+
+func newReadReg(reg string) (_ *ReadReg, err error) {
+	if _, ok := RegisterR8Offsets[reg]; !ok {
+		return nil, fmt.Errorf("unsupported register: %s", reg)
+	}
+	return &ReadReg{
+		register: reg,
+	}, nil
 }
 
 // BpfInstructions: dstBase[dstOffset] = op.register
@@ -252,9 +274,7 @@ func (f *FetchArg) Sprint(data []uint8) string {
 		value = fmt.Sprintf("%f", float32(binary.LittleEndian.Uint32(data)))
 	case "f64":
 		value = fmt.Sprintf("%f", float64(binary.LittleEndian.Uint64(data)))
-	case "c8":
-		value = fmt.Sprintf("%c", data[0])
-	case "c16", "c32", "c64", "c128", "c256":
+	case "c8", "c16", "c32", "c64", "c128", "c256":
 		value = string(data[:f.Size])
 	}
 	return fmt.Sprintf("%s=%s", f.Varname, value)
