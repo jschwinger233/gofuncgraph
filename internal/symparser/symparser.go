@@ -27,6 +27,16 @@ func New(bin string) (_ *SymParser, err error) {
 }
 
 func (p *SymParser) ParseUprobes(in, ex []string, fetch map[string]map[string]string, depth int, backtrace bool) (uprobes []Uprobe, err error) {
+	fetchArgs := map[string][]*FetchArg{}
+	for funcname, fet := range fetch {
+		for name, state := range fet {
+			fa, err := NewFetchArg(name, state)
+			if err != nil {
+				return nil, err
+			}
+			fetchArgs[funcname] = append(fetchArgs[funcname], fa)
+		}
+	}
 	funcnames, err := p.FuncnamesMatchedWildcards(in)
 	if err != nil {
 		return
@@ -56,6 +66,7 @@ func (p *SymParser) ParseUprobes(in, ex []string, fetch map[string]map[string]st
 				Offset:        self.FpOffset,
 				UserSpecified: userSpecified,
 				Backtrace:     userSpecified && backtrace,
+				FetchArgs:     fetchArgs[self.Name],
 			})
 			for _, off := range self.RetOffsets {
 				uprobes = append(uprobes, Uprobe{

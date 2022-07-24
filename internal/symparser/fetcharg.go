@@ -1,6 +1,7 @@
 package symparser
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,8 +14,7 @@ type FetchArg struct {
 	Statement string
 	Type      string
 	Size      int
-	Printer
-	Ops []FetchOp
+	Ops       []FetchOp
 }
 
 func NewFetchArg(varname, statement string) (_ *FetchArg, err error) {
@@ -24,39 +24,49 @@ func NewFetchArg(varname, statement string) (_ *FetchArg, err error) {
 		return
 	}
 
+	targetSize, err := strconv.Atoi(parts[1][1:])
+	if err != nil {
+		return
+	}
+	targetSize /= 8
+
 	ops := []FetchOp{}
-	offsets := []int{}
-	i := -1
-OUT:
-	for {
-		bytes := []byte{}
-		for {
-			i++
-			if i == len(parts[0]) {
-				break OUT
+	buf := []byte{}
+	for i := 0; i < len(parts[0]); i++ {
+		if parts[0][i] == '(' || parts[0][i] == ')' && len(buf) > 0 {
+			size := 8
+			if len(ops) == 0 {
+				size = targetSize
 			}
-
-			if parts[0][i] == '(' {
-				offset, err := strconv.Atoi(string(bytes))
-				if err != nil {
-					return nil, err
-				}
-				offsets = append(offsets, offset)
-				break
+			op, err := newFetchOp(string(buf), size)
+			if err != nil {
+				return nil, err
 			}
-
-			if parts[0][i] == ')' {
-				ops = append(ops, newFetchOp(offsets[len(offsets)-1], 8, string(bytes)))
-				offsets = offsets[:len(offsets)-1]
-				break
-			}
-
-			bytes = append(bytes, parts[0][i])
+			ops = append(ops, op)
+			buf = []byte{}
+			continue
+		}
+		if parts[0][i] != '(' && parts[0][i] != ')' {
+			buf = append(buf, parts[0][i])
 		}
 	}
+	if len(buf) > 0 {
+		op, err := newFetchOp(string(buf), targetSize)
+		if err != nil {
+			return nil, err
+		}
+		ops = append(ops, op)
+	}
+
+	// reverse
+	for i, j := 0, len(ops)-1; i < j; i, j = i+1, j-1 {
+		ops[i], ops[j] = ops[j], ops[i]
+	}
+
 	return &FetchArg{
 		Varname:   varname,
 		Statement: statement,
+		Size:      targetSize,
 		Type:      parts[1],
 		Ops:       ops,
 	}, nil
@@ -78,20 +88,20 @@ type FetchOp interface {
 	TargetSize() int16
 }
 
-func newFetchOp(offset, size int, base string) FetchOp {
-	if base[0] == '%' {
+func newFetchOp(op string, size int) (_ FetchOp, err error) {
+	if len(op) != 0 && op[0] == '%' {
 		return &ReadReg{
-			register: base[1:],
-		}
+			register: op[1:],
+		}, nil
+	}
+	offset, err := strconv.ParseInt(op, 10, 64)
+	if err != nil {
+		return
 	}
 	return &ReadMemory{
-		offset: int64(offset),
+		offset: offset,
 		size:   int64(size),
-	}
-}
-
-type Printer interface {
-	Sprint([]uint8) string
+	}, nil
 }
 
 var RegisterR8Offsets map[string]int16 = map[string]int16{
@@ -202,4 +212,36 @@ func (op *ReadMemory) BpfInstructions(srcR10Offset int16, dstBase asm.Register, 
 
 func (op *ReadMemory) TargetSize() int16 {
 	return int16(op.size)
+}
+
+func (f *FetchArg) Sprint(data []uint8) string {
+	data = data[:f.Size]
+	var value string
+	switch f.Type {
+	case "u8":
+		value = fmt.Sprintf("%d", data[0])
+	case "u16":
+		value = fmt.Sprintf("%d", binary.LittleEndian.Uint16(data))
+	case "u32":
+		value = fmt.Sprintf("%d", binary.LittleEndian.Uint32(data))
+	case "u64":
+		value = fmt.Sprintf("%d", binary.LittleEndian.Uint64(data))
+	case "s8":
+		value = fmt.Sprintf("%d", int8(data[0]))
+	case "s16":
+		value = fmt.Sprintf("%d", int16(binary.LittleEndian.Uint16(data)))
+	case "s32":
+		value = fmt.Sprintf("%d", int32(binary.LittleEndian.Uint32(data)))
+	case "s64":
+		value = fmt.Sprintf("%d", int64(binary.LittleEndian.Uint64(data)))
+	case "f32":
+		value = fmt.Sprintf("%f", float32(binary.LittleEndian.Uint32(data)))
+	case "f64":
+		value = fmt.Sprintf("%f", float64(binary.LittleEndian.Uint64(data)))
+	case "c8":
+		value = fmt.Sprintf("%c", data[0])
+	case "c16", "c32", "c64", "c128", "c256":
+		value = string(data[:f.Size])
+	}
+	return fmt.Sprintf("%s=%s", f.Varname, value)
 }

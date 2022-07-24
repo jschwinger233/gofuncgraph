@@ -6,6 +6,7 @@ require (
 	github.com/cilium/ebpf v0.9.0
 	github.com/elastic/go-sysinfo v1.8.0
 	github.com/go-delve/delve v1.8.3
+	github.com/ompluscator/dynamic-struct v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.10.3

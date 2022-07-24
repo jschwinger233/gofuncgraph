@@ -92,12 +92,11 @@ int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
     __builtin_memset(e, 0, sizeof(*e));
 
     // manipulate bpf inst
-    void *a, *b;
-    __u8 c;
-    a = (void*)ctx->rax+8;
-    bpf_probe_read_user(&b, sizeof(a), (void*)a+8);
-    bpf_probe_read_user(&e->data, 8, (void*)b+56);
-    //__builtin_memcpy(&e->data, &c, sizeof(c));
+    //void *a, *b;
+    //__u8 c;
+    //bpf_probe_read_user(&b, sizeof(a), (void*)a);
+    //bpf_probe_read_user(&e->data, 8, (void*)a);
+    //__builtin_memcpy(&e->data, &ctx->rax, 4);
     // manipulation ends
 
     __u64 this_bp = ctx->rbp;

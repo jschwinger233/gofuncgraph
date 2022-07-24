@@ -24,10 +24,6 @@ type Tracer struct {
 }
 
 func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer, err error) {
-	bpf := bpf.New()
-	if err = bpf.Load(); err != nil {
-		return
-	}
 	symParser, err := symparser.New(bin)
 	if err != nil {
 		return
@@ -38,9 +34,13 @@ func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer,
 		backtrace: backtrace,
 		depth:     depth,
 
-		bpf:       bpf,
 		symParser: symParser,
 	}, nil
+}
+
+func (t *Tracer) LoadBpf(uprobes []symparser.Uprobe) (err error) {
+	t.bpf = bpf.New()
+	return t.bpf.Load(uprobes)
 }
 
 func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, err error) {
@@ -100,6 +100,9 @@ func (t *Tracer) Start() (err error) {
 	}
 	log.Infof("found %d uprobes\n", len(uprobes))
 
+	if err = t.LoadBpf(uprobes); err != nil {
+		return
+	}
 	if err = t.bpf.Attach(t.bin, uprobes); err != nil {
 		return
 	}

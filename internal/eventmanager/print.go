@@ -49,7 +49,21 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%s %s %s { %s\n", t, indent, sym.Name, callChain)
+			uprobe, err := p.GetUprobe(event)
+			if err != nil {
+				return err
+			}
+			if len(uprobe.FetchArgs) == 0 {
+				fmt.Printf("%s %s %s { %s\n", t, indent, sym.Name, callChain)
+			} else {
+				args := []string{}
+				data := event.Data[:]
+				for _, arg := range uprobe.FetchArgs {
+					args = append(args, arg.Sprint(data))
+					data = data[arg.Size:]
+				}
+				fmt.Printf("%s %s %s(%s) { %s\n", t, indent, sym.Name, strings.Join(args, ", "), callChain)
+			}
 			indent += "  "
 		} else {
 			if len(indent) == 0 {
