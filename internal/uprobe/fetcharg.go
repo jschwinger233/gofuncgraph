@@ -1,4 +1,4 @@
-package symparser
+package uprobe
 
 import (
 	"encoding/binary"
@@ -17,7 +17,21 @@ type FetchArg struct {
 	Ops       []FetchOp
 }
 
-func NewFetchArg(varname, statement string) (_ *FetchArg, err error) {
+func parseFetchArgs(fetch map[string]map[string]string) (fetchArgs map[string][]*FetchArg, err error) {
+	fetchArgs = map[string][]*FetchArg{}
+	for funcname, fet := range fetch {
+		for name, statement := range fet {
+			fa, err := newFetchArg(name, statement)
+			if err != nil {
+				return nil, err
+			}
+			fetchArgs[funcname] = append(fetchArgs[funcname], fa)
+		}
+	}
+	return
+}
+
+func newFetchArg(varname, statement string) (_ *FetchArg, err error) {
 	parts := strings.Split(statement, ":")
 	if len(parts) != 2 {
 		err = fmt.Errorf("type not found: %s", statement)

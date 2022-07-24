@@ -11,7 +11,7 @@ import (
 
 func (p *EventManager) SprintCallChain(event bpf.UfuncgraphEvent) (chain string, err error) {
 	calls := []string{}
-	sym, off, err := p.symparser.ResolveAddress(event.CallerIp)
+	sym, off, err := p.elf.ResolveAddress(event.CallerIp)
 	if err != nil {
 		return
 	}
@@ -26,7 +26,7 @@ func (p *EventManager) SprintCallChain(event bpf.UfuncgraphEvent) (chain string,
 		if offset >= len(event.Bt) {
 			break
 		}
-		sym, off, err := p.symparser.ResolveAddress(ip)
+		sym, off, err := p.elf.ResolveAddress(ip)
 		if err != nil {
 			return "", err
 		}
@@ -40,7 +40,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 	fmt.Println()
 	for _, event := range p.goroutine2events[StackId] {
 		t := p.bootTime.Add(time.Duration(event.TimeNs)).Format("2006-01-02 15:04:05.0000")
-		sym, offset, err := p.symparser.ResolveAddress(event.Ip)
+		sym, offset, err := p.elf.ResolveAddress(event.Ip)
 		if err != nil {
 			return err
 		}

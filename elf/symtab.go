@@ -56,3 +56,24 @@ func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
 	}
 	return
 }
+
+func (e *ELF) FuncPcRangeInSymtab(name string) (lowpc, highpc uint64, err error) {
+	symbols, symnames, err := e.Symbols()
+	if err != nil {
+		return
+	}
+
+	sym, ok := symnames[name]
+	if !ok || elf.ST_TYPE(sym.Info) != elf.STT_FUNC {
+		err = errors.WithMessage(SymbolNotFoundError, name)
+		return
+	}
+
+	idx := sort.Search(len(symbols), func(i int) bool { return symbols[i].Value > sym.Value })
+	if idx < len(symbols) {
+		highpc = symbols[idx].Value
+	}
+
+	lowpc = sym.Value
+	return
+}

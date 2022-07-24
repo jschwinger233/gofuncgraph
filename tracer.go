@@ -7,40 +7,38 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/jschwinger233/ufuncgraph/elf"
 	"github.com/jschwinger233/ufuncgraph/internal/bpf"
 	"github.com/jschwinger233/ufuncgraph/internal/eventmanager"
-	"github.com/jschwinger233/ufuncgraph/internal/symparser"
+	"github.com/jschwinger233/ufuncgraph/internal/uprobe"
 	log "github.com/sirupsen/logrus"
 )
 
 type Tracer struct {
 	bin       string
+	elf       *elf.ELF
 	args      []string
 	backtrace bool
 	depth     int
 
-	bpf       *bpf.BPF
-	symParser *symparser.SymParser
+	bpf *bpf.BPF
 }
 
 func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer, err error) {
-	symParser, err := symparser.New(bin)
+	elf, err := elf.New(bin)
 	if err != nil {
 		return
 	}
+
 	return &Tracer{
 		bin:       bin,
+		elf:       elf,
 		args:      args,
 		backtrace: backtrace,
 		depth:     depth,
 
-		symParser: symParser,
+		bpf: bpf.New(),
 	}, nil
-}
-
-func (t *Tracer) LoadBpf(uprobes []symparser.Uprobe) (err error) {
-	t.bpf = bpf.New()
-	return t.bpf.Load(uprobes)
 }
 
 func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, err error) {
@@ -94,13 +92,19 @@ func (t *Tracer) Start() (err error) {
 	if err != nil {
 		return
 	}
-	uprobes, err := t.symParser.ParseUprobes(in, ex, fetch, t.depth, t.backtrace)
+	uprobes, err := uprobe.Parse(t.elf, &uprobe.ParseOptions{
+		Wildcards:   in,
+		ExWildcards: ex,
+		Fetch:       fetch,
+		SearchDepth: t.depth,
+		Backtrace:   t.backtrace,
+	})
 	if err != nil {
 		return
 	}
 	log.Infof("found %d uprobes\n", len(uprobes))
 
-	if err = t.LoadBpf(uprobes); err != nil {
+	if err = t.bpf.Load(uprobes); err != nil {
 		return
 	}
 	if err = t.bpf.Attach(t.bin, uprobes); err != nil {
@@ -110,7 +114,7 @@ func (t *Tracer) Start() (err error) {
 	defer t.bpf.Detach()
 	log.Info("start tracing\n")
 
-	eventManager, err := eventmanager.New(uprobes, t.symParser)
+	eventManager, err := eventmanager.New(uprobes, t.elf)
 	if err != nil {
 		return
 	}

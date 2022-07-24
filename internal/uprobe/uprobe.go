@@ -1,4 +1,4 @@
-package symparser
+package uprobe
 
 type UprobeLocation int
 

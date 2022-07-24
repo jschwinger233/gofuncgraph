@@ -9,7 +9,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/link"
-	"github.com/jschwinger233/ufuncgraph/internal/symparser"
+	"github.com/jschwinger233/ufuncgraph/internal/uprobe"
 	dynamicstruct "github.com/ompluscator/dynamic-struct"
 )
 
@@ -30,11 +30,10 @@ type BPF struct {
 func New() *BPF {
 	return &BPF{
 		executables: map[string]*link.Executable{},
-		objs:        &UfuncgraphObjects{},
 	}
 }
 
-func (b *BPF) Load(uprobes []symparser.Uprobe) (err error) {
+func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	structDefine := dynamicstruct.NewStruct().
 		AddField("Entpoint", &ebpf.Program{}, `ebpf:"entpoint"`).
 		AddField("EntpointWithBt", &ebpf.Program{}, `ebpf:"entpoint_with_bt"`).
@@ -48,21 +47,21 @@ func (b *BPF) Load(uprobes []symparser.Uprobe) (err error) {
 		return err
 	}
 
-	for _, uprobe := range uprobes {
-		if uprobe.Location != symparser.AtFramePointer || len(uprobe.FetchArgs) == 0 {
+	for _, up := range uprobes {
+		if up.Location != uprobe.AtFramePointer || len(up.FetchArgs) == 0 {
 			continue
 		}
 		fieldPrefix, progPrefix := "Entpoint", "entpoint"
-		if uprobe.Backtrace {
+		if up.Backtrace {
 			fieldPrefix, progPrefix = "EntpointWithBt", "entpoint_with_bt"
 		}
-		suffix := fmt.Sprintf("_%x", uprobe.Offset)
+		suffix := fmt.Sprintf("_%x", up.Offset)
 		progName := progPrefix + suffix
 		structDefine.AddField(fieldPrefix+suffix, &ebpf.Program{}, fmt.Sprintf(`ebpf:"%s"`, progName))
 		spec.Programs[progName] = spec.Programs["entpoint"].Copy()
 		instructions := []asm.Instruction{}
 		eventOffset := EventDataOffset
-		for _, args := range uprobe.FetchArgs {
+		for _, args := range up.FetchArgs {
 			instructions = append(instructions, args.CompileBpfInstructions(VacantR10Offset, eventOffset)...)
 			eventOffset += int64(args.Size)
 		}
@@ -77,33 +76,33 @@ func (b *BPF) Load(uprobes []symparser.Uprobe) (err error) {
 	//b.closers = append(b.closers, b.objs)
 }
 
-func (b *BPF) Attach(bin string, uprobes []symparser.Uprobe) (err error) {
+func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 	ex, err := link.OpenExecutable(bin)
 	if err != nil {
 		return
 	}
 	reader := dynamicstruct.NewReader(b.objs)
-	for _, uprobe := range uprobes {
+	for _, up := range uprobes {
 		var prog *ebpf.Program
-		switch uprobe.Location {
-		case symparser.AtFramePointer:
+		switch up.Location {
+		case uprobe.AtFramePointer:
 			suffix := ""
-			if len(uprobe.FetchArgs) > 0 {
-				suffix = fmt.Sprintf("_%x", uprobe.Offset)
+			if len(up.FetchArgs) > 0 {
+				suffix = fmt.Sprintf("_%x", up.Offset)
 			}
-			if uprobe.Backtrace {
+			if up.Backtrace {
 				prog = reader.GetField("EntpointWithBt" + suffix).Interface().(*ebpf.Program)
 			} else {
 				prog = reader.GetField("Entpoint" + suffix).Interface().(*ebpf.Program)
 			}
-		case symparser.AtRet:
+		case uprobe.AtRet:
 			prog = reader.GetField("Retpoint").Interface().(*ebpf.Program)
 		}
-		uprobe, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: uprobe.Offset})
+		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.Offset})
 		if err != nil {
 			return err
 		}
-		b.closers = append(b.closers, uprobe)
+		b.closers = append(b.closers, up)
 
 	}
 	return
