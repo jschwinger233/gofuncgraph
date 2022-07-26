@@ -1,4 +1,4 @@
-package utils
+package uprobe
 
 func MatchWildcard(pattern, str string) bool {
 	if len(pattern) == 0 && len(str) == 0 {
