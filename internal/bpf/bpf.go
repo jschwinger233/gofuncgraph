@@ -58,7 +58,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		suffix := fmt.Sprintf("_%x", up.Offset)
 		progName := progPrefix + suffix
 		structDefine.AddField(fieldPrefix+suffix, &ebpf.Program{}, fmt.Sprintf(`ebpf:"%s"`, progName))
-		spec.Programs[progName] = spec.Programs["entpoint"].Copy()
+		spec.Programs[progName] = spec.Programs[progPrefix].Copy()
 		instructions := []asm.Instruction{}
 		eventOffset := EventDataOffset
 		for _, args := range up.FetchArgs {
@@ -67,7 +67,14 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		}
 
 		spec.Programs[progName].Instructions = append(spec.Programs[progName].Instructions[:BpfInsertIndex], append(instructions, spec.Programs[progName].Instructions[BpfInsertIndex:]...)...)
-		spec.Programs[progName].Instructions[13].Offset += int16(len(instructions))
+
+		for i, ins := range spec.Programs[progName].Instructions {
+			if ins.OpCode == 21 { // goto
+				if i < BpfInsertIndex {
+					spec.Programs[progName].Instructions[i].Offset += int16(len(instructions))
+				}
+			}
+		}
 	}
 	b.objs = structDefine.Build().New()
 

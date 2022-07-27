@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/jschwinger233/ufuncgraph/elf"
-	"github.com/jschwinger233/ufuncgraph/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -56,7 +55,7 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 		for _, symbol := range symbols {
 			if debugelf.ST_TYPE(symbol.Info) == debugelf.STT_FUNC {
 				for _, wc := range wildcards {
-					if utils.MatchWildcard(wc, symbol.Name) {
+					if MatchWildcard(wc, symbol.Name) {
 						funcnames = append(funcnames, symbol.Name)
 						break
 					}
@@ -83,7 +82,7 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 			return
 		}
 		for _, wc := range ex {
-			if utils.MatchWildcard(wc, name) {
+			if MatchWildcard(wc, name) {
 				tree.Err = fmt.Errorf("excluded by %s", wc)
 				break
 			}
