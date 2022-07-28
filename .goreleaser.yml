@@ -1,0 +1,38 @@
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: ufuncgraph
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -X github.com/jschwinger233/ufuncgraph/version.REVISION={{.Commit}}
+      - -X github.com/jschwinger233/ufuncgraph/version.VERSION={{.Env.VERSION}}
+      - -X github.com/jschwinger233/ufuncgraph/version.BUILTAT={{.Date}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+archives:
+  - replacements:
+      linux: Linux
+      amd64: x86_64
+
+checksum:
+  name_template: 'checksums.txt'
+
+release:
+  prerelease: auto
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+
