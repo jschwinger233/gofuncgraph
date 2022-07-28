@@ -4,9 +4,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 
+	"github.com/jschwinger233/ufuncgraph/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
@@ -30,6 +32,10 @@ func init() {
 }
 
 func main() {
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Print(version.String())
+	}
+
 	app := &cli.App{
 		Name: "ufuncgraph",
 		// TODO@zc: kernel version
@@ -46,6 +52,7 @@ example: trace a specific function and its downstream functions within 3 layers,
 example: trace a specific function with some arguemnts and backtrace
   ufuncgraph --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%ax):u64, myKey=+0(+24(%rax)):c128)'
  `,
+		Version: version.VERSION,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "backtrace",
