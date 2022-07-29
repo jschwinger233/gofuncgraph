@@ -39,7 +39,7 @@ func main() {
 	app := &cli.App{
 		Name: "ufuncgraph",
 		// TODO@zc: kernel version
-		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for userspace! \n(only Golang in x86_64 little-endian Linux is supported for now)",
+		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for userspace! \n(only non-stripped static-linking Golang on x86-64 little-endian Linux is supported for now)",
 		UsageText: `example: trace a specific function in etcd client "go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire"
   ufuncgraph ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
 

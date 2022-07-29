@@ -25,7 +25,7 @@ func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTre
 	cont := f(layer, parent, self)
 	if cont {
 		for _, tree := range t.Children {
-			t.Visit(layer+1, t, tree, f)
+			tree.Visit(layer+1, t, tree, f)
 		}
 	}
 }

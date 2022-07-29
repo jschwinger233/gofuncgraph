@@ -1,6 +1,8 @@
 package uprobe
 
-import "github.com/jschwinger233/ufuncgraph/elf"
+import (
+	"github.com/jschwinger233/ufuncgraph/elf"
+)
 
 type ParseOptions struct {
 	Wildcards   []string
