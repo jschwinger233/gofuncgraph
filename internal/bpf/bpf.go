@@ -78,6 +78,15 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	}
 	b.objs = structDefine.Build().New()
 
+	defer func() {
+		if err != nil {
+			return
+		}
+		reader := dynamicstruct.NewReader(b.objs)
+		b.closers = append(b.closers, reader.GetField("EventQueue").Interface().(*ebpf.Map))
+		b.closers = append(b.closers, reader.GetField("BpfStack").Interface().(*ebpf.Map))
+		b.closers = append(b.closers, reader.GetField("Goids").Interface().(*ebpf.Map))
+	}()
 	return spec.LoadAndAssign(b.objs, nil)
 	// TODO@zc: closer
 	//b.closers = append(b.closers, b.objs)
