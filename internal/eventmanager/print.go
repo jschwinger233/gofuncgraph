@@ -91,8 +91,11 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 	return
 }
 
-func (g *EventManager) PrintRemaining() {
+func (g *EventManager) PrintRemaining() (err error) {
 	for StackId := range g.goroutine2events {
-		g.PrintStack(StackId)
+		if err = g.PrintStack(StackId); err != nil {
+			break
+		}
 	}
+	return
 }

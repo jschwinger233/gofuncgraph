@@ -127,6 +127,5 @@ func (t *Tracer) Start() (err error) {
 			break
 		}
 	}
-	eventManager.PrintRemaining()
-	return
+	return eventManager.PrintRemaining()
 }

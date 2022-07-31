@@ -20,7 +20,9 @@ func (m *EventManager) Handle(event bpf.UfuncgraphEvent) (err error) {
 			return err
 		}
 		if userSpecified {
-			m.PrintStack(event.StackId)
+			if err = m.PrintStack(event.StackId); err != nil {
+				return
+			}
 		}
 		m.ClearStack(event)
 	}
