@@ -3,7 +3,7 @@ package uprobe
 type UprobeLocation int
 
 const (
-	AtEntry UprobeLocation = iota
+	At0 UprobeLocation = iota
 	AtFramePointer
 	AtRet
 )

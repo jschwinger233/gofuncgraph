@@ -16,7 +16,6 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event Ufuncgraph ./ufuncgraph.c -- -I./headers
 
 const (
-	BpfInsertIndex        = 81
 	EventDataOffset int64 = 436
 	VacantR10Offset       = -96
 )
@@ -35,9 +34,12 @@ func New() *BPF {
 
 func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	structDefine := dynamicstruct.NewStruct().
-		AddField("Entpoint", &ebpf.Program{}, `ebpf:"entpoint"`).
-		AddField("EntpointWithBt", &ebpf.Program{}, `ebpf:"entpoint_with_bt"`).
-		AddField("Retpoint", &ebpf.Program{}, `ebpf:"retpoint"`).
+		AddField("GoEnt", &ebpf.Program{}, `ebpf:"go_ent"`).
+		AddField("GoEntBt", &ebpf.Program{}, `ebpf:"go_ent_bt"`).
+		AddField("CEnt", &ebpf.Program{}, `ebpf:"c_ent"`).
+		AddField("CEntBt", &ebpf.Program{}, `ebpf:"c_ent_bt"`).
+		AddField("GoRet", &ebpf.Program{}, `ebpf:"go_ret"`).
+		AddField("CRet", &ebpf.Program{}, `ebpf:"c_ret"`).
 		AddField("BpfStack", &ebpf.Map{}, `ebpf:"bpf_stack"`).
 		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`).
 		AddField("Goids", &ebpf.Map{}, `ebpf:"goids"`)
@@ -51,9 +53,9 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		if up.Location != uprobe.AtFramePointer || len(up.FetchArgs) == 0 {
 			continue
 		}
-		fieldPrefix, progPrefix := "Entpoint", "entpoint"
+		fieldPrefix, progPrefix := "GoEnt", "go_ent"
 		if up.Backtrace {
-			fieldPrefix, progPrefix = "EntpointWithBt", "entpoint_with_bt"
+			fieldPrefix, progPrefix = "GoEntBt", "go_ent_bt"
 		}
 		suffix := fmt.Sprintf("_%x", up.Offset)
 		progName := progPrefix + suffix
@@ -66,11 +68,20 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 			eventOffset += int64(args.Size)
 		}
 
-		spec.Programs[progName].Instructions = append(spec.Programs[progName].Instructions[:BpfInsertIndex], append(instructions, spec.Programs[progName].Instructions[BpfInsertIndex:]...)...)
+		bpfInsertIndex := 0
+		for bpfInsertIndex = range spec.Programs[progName].Instructions {
+			inst := spec.Programs[progName].Instructions[bpfInsertIndex]
+			if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R1 && inst.Offset == 0 {
+				break
+			}
+		}
+		bpfInsertIndex++
+
+		spec.Programs[progName].Instructions = append(spec.Programs[progName].Instructions[:bpfInsertIndex], append(instructions, spec.Programs[progName].Instructions[bpfInsertIndex:]...)...)
 
 		for i, ins := range spec.Programs[progName].Instructions {
 			if ins.OpCode == 21 { // goto
-				if i < BpfInsertIndex {
+				if i < bpfInsertIndex {
 					spec.Programs[progName].Instructions[i].Offset += int16(len(instructions))
 				}
 			}
@@ -88,8 +99,6 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		b.closers = append(b.closers, reader.GetField("Goids").Interface().(*ebpf.Map))
 	}()
 	return spec.LoadAndAssign(b.objs, nil)
-	// TODO@zc: closer
-	//b.closers = append(b.closers, b.objs)
 }
 
 func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
@@ -107,12 +116,12 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 				suffix = fmt.Sprintf("_%x", up.Offset)
 			}
 			if up.Backtrace {
-				prog = reader.GetField("EntpointWithBt" + suffix).Interface().(*ebpf.Program)
+				prog = reader.GetField("GoEntBt" + suffix).Interface().(*ebpf.Program)
 			} else {
-				prog = reader.GetField("Entpoint" + suffix).Interface().(*ebpf.Program)
+				prog = reader.GetField("GoEnt" + suffix).Interface().(*ebpf.Program)
 			}
 		case uprobe.AtRet:
-			prog = reader.GetField("Retpoint").Interface().(*ebpf.Program)
+			prog = reader.GetField("GoRet").Interface().(*ebpf.Program)
 		}
 		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.Offset})
 		if err != nil {

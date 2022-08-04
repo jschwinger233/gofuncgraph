@@ -7,6 +7,9 @@
 #define MAX_BT_LAYERS 50
 #define MAX_DATA_SIZE 100
 
+#define CLANG 0
+#define GOLANG 1
+
 #define ENTPOINT 0
 #define RETPOINT 1
 
@@ -76,7 +79,7 @@ void static backtrace(__u64 bp, struct stackwalk *walk, __u8 *bt_data, __u8 bt) 
 
 __u64 static new_stack_id() {
     __u32 key = 0;
-    __u32 *stack_id = bpf_map_lookup_elem(&goids, &key);;
+    __u32 *stack_id = bpf_map_lookup_elem(&goids, &key);
     if (!stack_id)
         return 0; // should not happen
     (*stack_id)++;
@@ -84,7 +87,7 @@ __u64 static new_stack_id() {
     return (*stack_id) | ((__u64)cpu << 32);
 }
 
-int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
+int static do_entpoint(struct pt_regs *ctx, __u8 bt, __u8 lang) {
     __u32 key = 0;
     struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
     if (!e)
@@ -102,11 +105,23 @@ int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
     __u64 this_bp = ctx->rbp;
     e->location = ENTPOINT;
     e->ip = ctx->rip;
-    bpf_probe_read_user(&e->caller_ip, sizeof(e->caller_ip), (void*)ctx->rbp+8);
     e->time_ns = bpf_ktime_get_ns();
+
+    void *cfa;
+    if (lang == CLANG)
+        cfa = (void*)ctx->rsp;
+     else if (lang == GOLANG)
+        cfa = (void*)ctx->rbp+8;
+    bpf_probe_read_user(&e->caller_ip, sizeof(e->caller_ip), cfa);
 
     __u64 caller_bp;
     bpf_probe_read_user(&caller_bp, sizeof(caller_bp), (void*)ctx->rbp);
+
+    if (lang == CLANG) {
+        e->stack_id = bpf_get_current_pid_tgid() << 32;
+        e->stack_depth = (__u16)-1;
+        goto submit_event;
+    }
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
@@ -125,22 +140,31 @@ int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
     }
 
 submit_event:
-    bpf_map_push_elem(&event_queue, e, BPF_EXIST);
-    return 0;
+    return bpf_map_push_elem(&event_queue, e, BPF_EXIST);
 }
 
-SEC("uprobe/entpoint_with_bt")
-int entpoint_with_bt(struct pt_regs *ctx) {
-    return do_entpoint(ctx, 1);
+SEC("uprobe/go_ent")
+int go_ent(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 0, GOLANG);
 }
 
-SEC("uprobe/entpoint")
-int entpoint(struct pt_regs *ctx) {
-    return do_entpoint(ctx, 0);
+SEC("uprobe/go_ent_bt")
+int go_ent_bt(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 1, GOLANG);
 }
 
-SEC("uprobe/retpoint")
-int retpoint(struct pt_regs *ctx) {
+SEC("uprobe/c_ent")
+int c_ent(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 0, CLANG);
+}
+
+SEC("uprobe/c_ent_bt")
+int c_ent_bt(struct pt_regs *ctx) {
+    return do_entpoint(ctx, 1, CLANG);
+}
+
+SEC("uprobe/go_ret")
+int go_ret(struct pt_regs *ctx) {
     __u32 key = 0;
     struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
     if (!e)
@@ -167,6 +191,22 @@ int retpoint(struct pt_regs *ctx) {
     }
 
 submit_event:
-    bpf_map_push_elem(&event_queue, e, BPF_EXIST);
-    return 0;
+    return bpf_map_push_elem(&event_queue, e, BPF_EXIST);
+}
+
+SEC("uretprobe/c_ret")
+int c_ret(struct pt_regs *ctx) {
+    __u32 key = 0;
+    struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
+    if (!e)
+        return 0; // should not happen
+    __builtin_memset(e, 0, sizeof(*e));
+
+    __u32 tid = (__u32)bpf_get_current_pid_tgid();
+    e->stack_id = bpf_get_current_pid_tgid() << 32;
+    e->location = RETPOINT;
+    e->ip = ctx->rip;
+    e->time_ns = bpf_ktime_get_ns();
+    e->stack_depth = (__u16)-1;
+    return bpf_map_push_elem(&event_queue, e, BPF_EXIST);
 }

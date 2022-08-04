@@ -66,9 +66,12 @@ type UfuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphProgramSpecs struct {
-	Entpoint       *ebpf.ProgramSpec `ebpf:"entpoint"`
-	EntpointWithBt *ebpf.ProgramSpec `ebpf:"entpoint_with_bt"`
-	Retpoint       *ebpf.ProgramSpec `ebpf:"retpoint"`
+	C_ent   *ebpf.ProgramSpec `ebpf:"c_ent"`
+	C_entBt *ebpf.ProgramSpec `ebpf:"c_ent_bt"`
+	C_ret   *ebpf.ProgramSpec `ebpf:"c_ret"`
+	GoEnt   *ebpf.ProgramSpec `ebpf:"go_ent"`
+	GoEntBt *ebpf.ProgramSpec `ebpf:"go_ent_bt"`
+	GoRet   *ebpf.ProgramSpec `ebpf:"go_ret"`
 }
 
 // UfuncgraphMapSpecs contains maps before they are loaded into the kernel.
@@ -116,16 +119,22 @@ func (m *UfuncgraphMaps) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphPrograms struct {
-	Entpoint       *ebpf.Program `ebpf:"entpoint"`
-	EntpointWithBt *ebpf.Program `ebpf:"entpoint_with_bt"`
-	Retpoint       *ebpf.Program `ebpf:"retpoint"`
+	C_ent   *ebpf.Program `ebpf:"c_ent"`
+	C_entBt *ebpf.Program `ebpf:"c_ent_bt"`
+	C_ret   *ebpf.Program `ebpf:"c_ret"`
+	GoEnt   *ebpf.Program `ebpf:"go_ent"`
+	GoEntBt *ebpf.Program `ebpf:"go_ent_bt"`
+	GoRet   *ebpf.Program `ebpf:"go_ret"`
 }
 
 func (p *UfuncgraphPrograms) Close() error {
 	return _UfuncgraphClose(
-		p.Entpoint,
-		p.EntpointWithBt,
-		p.Retpoint,
+		p.C_ent,
+		p.C_entBt,
+		p.C_ret,
+		p.GoEnt,
+		p.GoEntBt,
+		p.GoRet,
 	)
 }
 
