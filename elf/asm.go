@@ -50,6 +50,7 @@ func (e *ELF) FuncRetOffsets(name string) (offsets []uint64, err error) {
 	}
 	return
 }
+
 func (e *ELF) FuncFramePointerOffset(name string) (offset uint64, err error) {
 	insts, _, offset, err := e.FuncInstructions(name)
 	if err != nil {

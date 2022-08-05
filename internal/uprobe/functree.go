@@ -11,6 +11,7 @@ import (
 
 type FuncTree struct {
 	Name       string
+	EntOffset  uint64
 	FpOffset   uint64
 	RetOffsets []uint64
 	Children   []*FuncTree
@@ -30,20 +31,33 @@ func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTre
 	}
 }
 
-func (t *FuncTree) Print(indent int) {
-	prefix := strings.Repeat(" ", indent)
-	rets := []string{}
-	for _, ret := range t.RetOffsets {
-		rets = append(rets, fmt.Sprintf("%x", ret))
-	}
-	if t.Err == nil {
-		log.Infof("%s%s: %x %s\n", prefix, t.Name, t.FpOffset, rets)
-	} else {
-		log.Warnf("%s%s: %s\n", prefix, t.Name, t.Err)
-	}
-	for _, tree := range t.Children {
-		tree.Print(indent + 2)
-	}
+func (t *FuncTree) Print(lang string) {
+	t.Traverse(func(layer int, _, self *FuncTree) bool {
+		var (
+			entpoint  uint64
+			retpoints []string
+		)
+
+		indent := strings.Repeat(" ", layer*2)
+		switch lang {
+		case "go":
+			entpoint = self.FpOffset
+			for _, ret := range self.RetOffsets {
+				retpoints = append(retpoints, fmt.Sprintf("%x", ret))
+			}
+		case "c":
+			entpoint = self.EntOffset
+			log.Infof("%s%s: %x %s\n", indent, self.Name, entpoint, retpoints)
+			return true
+		}
+
+		if self.Err == nil {
+			log.Infof("%s%s: %x %s\n", indent, self.Name, entpoint, retpoints)
+		} else {
+			log.Warnf("%s%s: %s\n", indent, self.Name, self.Err)
+		}
+		return true
+	})
 }
 
 func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth int) (trees []*FuncTree, err error) {
@@ -73,6 +87,11 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 			tree.Err = err
 			return
 		}
+		offset, err := elf.FuncOffset(name)
+		if err != nil {
+			return
+		}
+		tree.EntOffset = offset
 		tree.FpOffset, tree.Err = elf.FuncFramePointerOffset(name)
 		if tree.Err != nil {
 			return

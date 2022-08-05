@@ -71,6 +71,14 @@ example: trace a specific function with some arguemnts and backtrace
 				Value: false,
 				Usage: "enable debug logging",
 			},
+			&cli.BoolFlag{
+				Name:  "c",
+				Usage: "tracee binary is a c program",
+			},
+			&cli.BoolFlag{
+				Name:  "go",
+				Usage: "tracee binary is a go program, default",
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.Bool("debug") {
@@ -87,7 +95,14 @@ example: trace a specific function with some arguemnts and backtrace
 				return cli.ShowAppHelp(ctx)
 			}
 
-			tracer, err := NewTracer(bin, args, backtrace, depth)
+			lang := "go"
+			if ctx.Bool("c") {
+				lang = "c"
+			} else {
+				ctx.Bool("go")
+				lang = "go"
+			}
+			tracer, err := NewTracer(bin, args, backtrace, depth, lang)
 			if err != nil {
 				return
 			}

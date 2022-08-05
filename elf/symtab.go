@@ -57,6 +57,15 @@ func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
 	return
 }
 
+func (f *ELF) FuncOffset(name string) (offset uint64, err error) {
+	sym, err := f.ResolveSymbol(name)
+	if err != nil {
+		return
+	}
+	section := f.Section(".text")
+	return sym.Value - section.Addr + section.Offset, nil
+}
+
 func (e *ELF) FuncPcRangeInSymtab(name string) (lowpc, highpc uint64, err error) {
 	symbols, symnames, err := e.Symbols()
 	if err != nil {

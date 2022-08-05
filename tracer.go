@@ -20,11 +20,12 @@ type Tracer struct {
 	args      []string
 	backtrace bool
 	depth     int
+	lang      string
 
 	bpf *bpf.BPF
 }
 
-func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer, err error) {
+func NewTracer(bin string, args []string, backtrace bool, depth int, lang string) (_ *Tracer, err error) {
 	elf, err := elf.New(bin)
 	if err != nil {
 		return
@@ -36,6 +37,7 @@ func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer,
 		args:      args,
 		backtrace: backtrace,
 		depth:     depth,
+		lang:      lang,
 
 		bpf: bpf.New(),
 	}, nil
@@ -98,6 +100,7 @@ func (t *Tracer) Start() (err error) {
 		Fetch:       fetch,
 		SearchDepth: t.depth,
 		Backtrace:   t.backtrace,
+		Lang:        t.lang,
 	})
 	if err != nil {
 		return
@@ -124,7 +127,7 @@ func (t *Tracer) Start() (err error) {
 
 	for event := range t.bpf.PollEvents(ctx) {
 		if err = eventManager.Handle(event); err != nil {
-			break
+			return
 		}
 	}
 	return eventManager.PrintRemaining()

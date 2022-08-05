@@ -15,7 +15,7 @@ func (m *EventManager) Handle(event bpf.UfuncgraphEvent) (err error) {
 	m.Add(event)
 	log.Debugf("added event: %+v", event)
 	if m.CloseStack(event) {
-		userSpecified, err := m.UserSpecified(event)
+		userSpecified, err := m.UserSpecified(m.goroutine2events[event.StackId][0])
 		if err != nil {
 			return err
 		}
@@ -35,7 +35,7 @@ func (p *EventManager) Add(event bpf.UfuncgraphEvent) {
 	if length == 0 && event.Location == 1 {
 		return
 	}
-	if length > 0 && event.Location == 0 && p.goroutine2events[event.StackId][length-1].Location == 0 && p.goroutine2events[event.StackId][length-1].StackDepth == event.StackDepth && p.goroutine2events[event.StackId][length-1].Ip == event.Ip {
+	if event.StackDepth != 65535 && length > 0 && event.Location == 0 && p.goroutine2events[event.StackId][length-1].Location == 0 && p.goroutine2events[event.StackId][length-1].StackDepth == event.StackDepth && p.goroutine2events[event.StackId][length-1].Ip == event.Ip {
 		return
 	}
 	p.goroutine2events[event.StackId] = append(p.goroutine2events[event.StackId], event)
