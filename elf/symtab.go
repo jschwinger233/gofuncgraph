@@ -28,7 +28,11 @@ func (f *ELF) Symbols() (symbols []elf.Symbol, symnames map[string]elf.Symbol, e
 	return
 }
 
-func (f *ELF) ResolveAddress(addr uint64) (sym elf.Symbol, offset uint, err error) {
+func (f *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err error) {
+	if addr == 0 {
+		err = errors.WithMessage(SymbolNotFoundError, "0")
+		return
+	}
 	symbols, _, err := f.Symbols()
 	if err != nil {
 		return
@@ -40,8 +44,14 @@ func (f *ELF) ResolveAddress(addr uint64) (sym elf.Symbol, offset uint, err erro
 		return
 	}
 
-	sym = symbols[idx-1]
-	return sym, uint(addr - sym.Value), nil
+	sym := symbols[idx-1]
+	for i := idx - 1; i >= 0 && symbols[i].Value == sym.Value; i-- {
+		syms = append(syms, symbols[i])
+	}
+	for i := idx; i < len(symbols) && symbols[i].Value == sym.Value; i++ {
+		syms = append(syms, symbols[i])
+	}
+	return syms, uint(addr - sym.Value), nil
 }
 
 func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {

@@ -26,11 +26,11 @@ func (e *ELF) FuncCalledBy(funcname string) (called []string, err error) {
 			if !ok {
 				continue
 			}
-			sym, off, err := e.ResolveAddress(uint64(int64(addr) + int64(rel)))
-			if err != nil && off != 0 {
+			syms, off, err := e.ResolveAddress(uint64(int64(addr) + int64(rel)))
+			if err != nil || off != 0 {
 				continue
 			}
-			called = append(called, sym.Name)
+			called = append(called, syms[0].Name)
 		}
 	}
 	return

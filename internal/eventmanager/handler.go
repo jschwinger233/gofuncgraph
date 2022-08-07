@@ -43,7 +43,7 @@ func (p *EventManager) Add(event bpf.UfuncgraphEvent) {
 }
 
 func (p *EventManager) CloseStack(event bpf.UfuncgraphEvent) bool {
-	return p.goroutine2stack[event.StackId] == 0
+	return p.goroutine2stack[event.StackId] == 0 && len(p.goroutine2events[event.StackId]) > 0
 }
 
 func (p *EventManager) ClearStack(event bpf.UfuncgraphEvent) {

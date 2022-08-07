@@ -41,14 +41,16 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
 }
 
 func (p *EventManager) GetUprobe(event bpf.UfuncgraphEvent) (_ uprobe.Uprobe, err error) {
-	sym, _, err := p.elf.ResolveAddress(event.Ip)
+	syms, _, err := p.elf.ResolveAddress(event.Ip)
 	if err != nil {
 		return
 	}
-	uprobe, ok := p.uprobes[sym.Name]
-	if !ok {
-		err = errors.New("uprobe not found")
-		return
+	for _, sym := range syms {
+		uprobe, ok := p.uprobes[sym.Name]
+		if ok {
+			return uprobe, nil
+		}
 	}
-	return uprobe, nil
+	err = errors.New("uprobe not found")
+	return
 }

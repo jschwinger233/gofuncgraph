@@ -15,11 +15,11 @@ const (
 
 func (p *EventManager) SprintCallChain(event bpf.UfuncgraphEvent) (chain string, err error) {
 	calls := []string{}
-	sym, off, err := p.elf.ResolveAddress(event.CallerIp)
+	syms, off, err := p.elf.ResolveAddress(event.CallerIp)
 	if err != nil {
 		return
 	}
-	calls = append(calls, fmt.Sprintf("%s+%d", sym.Name, off))
+	calls = append(calls, fmt.Sprintf("%s+%d", syms[0].Name, off))
 	offset := 0
 	for {
 		ip := binary.LittleEndian.Uint64(event.Bt[offset : offset+8])
@@ -30,11 +30,11 @@ func (p *EventManager) SprintCallChain(event bpf.UfuncgraphEvent) (chain string,
 		if offset >= len(event.Bt) {
 			break
 		}
-		sym, off, err := p.elf.ResolveAddress(ip)
+		syms, off, err := p.elf.ResolveAddress(ip)
 		if err != nil {
 			return "", err
 		}
-		calls = append(calls, fmt.Sprintf("%s+%d", sym.Name, off))
+		calls = append(calls, fmt.Sprintf("%s+%d", syms[0].Name, off))
 	}
 	return strings.Join(calls, " > "), nil
 }
@@ -46,7 +46,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 	var lastEvent bpf.UfuncgraphEvent
 	for _, event := range p.goroutine2events[StackId] {
 		t := p.bootTime.Add(time.Duration(event.TimeNs)).Format("02 15:04:05.0000")
-		sym, offset, err := p.elf.ResolveAddress(event.Ip)
+		syms, offset, err := p.elf.ResolveAddress(event.Ip)
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
 			}
 			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %8.4f %s %s { %s\n", t, sinceLastEvent, indent, sym.Name, callChain)
+				fmt.Printf("%s %8.4f %s %s { %s\n", t, sinceLastEvent, indent, syms[0].Name, callChain)
 			} else {
 				args := []string{}
 				data := event.Data[:]
@@ -73,7 +73,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 					args = append(args, arg.Sprint(data))
 					data = data[arg.Size:]
 				}
-				fmt.Printf("%s %8.4f %s %s(%s) { %s\n", t, sinceLastEvent, indent, sym.Name, strings.Join(args, ", "), callChain)
+				fmt.Printf("%s %8.4f %s %s(%s) { %s\n", t, sinceLastEvent, indent, syms[0].Name, strings.Join(args, ", "), callChain)
 			}
 			indent += "  "
 		} else {
@@ -83,7 +83,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 			elapsed := event.TimeNs - startTimeStack[len(startTimeStack)-1]
 			startTimeStack = startTimeStack[:len(startTimeStack)-1]
 			indent = indent[:len(indent)-2]
-			fmt.Printf("%s %8.4f %s } %s+%d\n", t, time.Duration(elapsed).Seconds(), indent, sym.Name, offset)
+			fmt.Printf("%s %8.4f %s } %s+%d\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset)
 		}
 
 		lastEvent = event

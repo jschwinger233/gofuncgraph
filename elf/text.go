@@ -24,7 +24,7 @@ func (e *ELF) FuncRawInstructions(name string) (bytes []byte, addr, offset uint6
 		return
 	}
 
-	if uint64(len(bytes)) < highpc-section.Addr {
+	if uint64(len(bytes)) < highpc-section.Addr || lowpc < section.Addr {
 		err = errors.WithMessage(PcRangeTooLargeErr, name)
 		return
 	}
