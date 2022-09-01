@@ -62,6 +62,7 @@ func New(bin string) (_ *ELF, err error) {
 	}
 	dwarfData, err := dwarf.New(abbrev, aranges, frame, info, line, pubnames, ranges, str)
 	if err != nil {
+		println("...")
 		return
 	}
 	return &ELF{

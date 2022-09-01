@@ -31,7 +31,7 @@ func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTre
 	}
 }
 
-func (t *FuncTree) Print(lang string) {
+func (t *FuncTree) Print() {
 	t.Traverse(func(layer int, _, self *FuncTree) bool {
 		var (
 			entpoint  uint64
@@ -39,16 +39,9 @@ func (t *FuncTree) Print(lang string) {
 		)
 
 		indent := strings.Repeat(" ", layer*2)
-		switch lang {
-		case "go":
-			entpoint = self.FpOffset
-			for _, ret := range self.RetOffsets {
-				retpoints = append(retpoints, fmt.Sprintf("%x", ret))
-			}
-		case "c":
-			entpoint = self.EntOffset
-			log.Infof("%s%s: %x %s\n", indent, self.Name, entpoint, retpoints)
-			return true
+		entpoint = self.FpOffset
+		for _, ret := range self.RetOffsets {
+			retpoints = append(retpoints, fmt.Sprintf("%x", ret))
 		}
 
 		if self.Err == nil {

@@ -34,12 +34,9 @@ func New() *BPF {
 
 func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	structDefine := dynamicstruct.NewStruct().
-		AddField("GoEnt", &ebpf.Program{}, `ebpf:"go_ent"`).
-		AddField("GoEntBt", &ebpf.Program{}, `ebpf:"go_ent_bt"`).
-		AddField("CEnt", &ebpf.Program{}, `ebpf:"c_ent"`).
-		AddField("CEntBt", &ebpf.Program{}, `ebpf:"c_ent_bt"`).
-		AddField("GoRet", &ebpf.Program{}, `ebpf:"go_ret"`).
-		AddField("CRet", &ebpf.Program{}, `ebpf:"c_ret"`).
+		AddField("Ent", &ebpf.Program{}, `ebpf:"ent"`).
+		AddField("EntBt", &ebpf.Program{}, `ebpf:"ent_bt"`).
+		AddField("Ret", &ebpf.Program{}, `ebpf:"ret"`).
 		AddField("BpfStack", &ebpf.Map{}, `ebpf:"bpf_stack"`).
 		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`).
 		AddField("Goids", &ebpf.Map{}, `ebpf:"goids"`)
@@ -50,16 +47,12 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	}
 
 	for _, up := range uprobes {
-		if !(up.Location == uprobe.AtFramePointer || up.Location == uprobe.AtEntry) || len(up.FetchArgs) == 0 {
+		if (up.Location != uprobe.AtFramePointer) || len(up.FetchArgs) == 0 {
 			continue
 		}
-		fieldLangPrefix, progLangPrefix := "Go", "go"
-		if up.Location == uprobe.AtEntry {
-			fieldLangPrefix, progLangPrefix = "C", "c"
-		}
-		fieldPrefix, progPrefix := fieldLangPrefix+"Ent", progLangPrefix+"_ent"
+		fieldPrefix, progPrefix := "Ent", "ent"
 		if up.Backtrace {
-			fieldPrefix, progPrefix = fieldLangPrefix+"EntBt", progLangPrefix+"_ent_bt"
+			fieldPrefix, progPrefix = "EntBt", "ent_bt"
 		}
 		suffix := fmt.Sprintf("_%x", up.Offset)
 		progName := progPrefix + suffix
@@ -120,20 +113,12 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 				suffix = fmt.Sprintf("_%x", up.Offset)
 			}
 			if up.Backtrace {
-				prog = reader.GetField("GoEntBt" + suffix).Interface().(*ebpf.Program)
+				prog = reader.GetField("EntBt" + suffix).Interface().(*ebpf.Program)
 			} else {
-				prog = reader.GetField("GoEnt" + suffix).Interface().(*ebpf.Program)
+				prog = reader.GetField("Ent" + suffix).Interface().(*ebpf.Program)
 			}
 		case uprobe.AtRet:
-			prog = reader.GetField("GoRet").Interface().(*ebpf.Program)
-		case uprobe.AtEntry:
-			prog = reader.GetField("CRet").Interface().(*ebpf.Program)
-			up, err := ex.Uretprobe("", prog, &link.UprobeOptions{Offset: up.Offset})
-			if err != nil {
-				return err
-			}
-			b.closers = append(b.closers, up)
-			prog = reader.GetField("CEnt").Interface().(*ebpf.Program)
+			prog = reader.GetField("Ret").Interface().(*ebpf.Program)
 		}
 		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.Offset})
 		if err != nil {

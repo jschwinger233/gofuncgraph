@@ -27,7 +27,7 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
 	bootTime := host.Info().BootTime
 	uprobesMap := map[string]uprobe.Uprobe{}
 	for _, up := range uprobes {
-		if up.Location == uprobe.AtFramePointer || up.Location == uprobe.AtEntry {
+		if up.Location == uprobe.AtFramePointer {
 			uprobesMap[up.Funcname] = up
 		}
 	}
