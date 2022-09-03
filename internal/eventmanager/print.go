@@ -65,7 +65,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
 			}
 			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %8.4f %s %s { %s\n", t, sinceLastEvent, indent, syms[0].Name, callChain)
+				fmt.Printf("%s %8.4f %s %s+%d { %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, callChain)
 			} else {
 				args := []string{}
 				data := event.Data[:]
@@ -73,7 +73,7 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 					args = append(args, arg.Sprint(data))
 					data = data[arg.Size:]
 				}
-				fmt.Printf("%s %8.4f %s %s(%s) { %s\n", t, sinceLastEvent, indent, syms[0].Name, strings.Join(args, ", "), callChain)
+				fmt.Printf("%s %8.4f %s %s+%d(%s) { %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(args, ", "), callChain)
 			}
 			indent += "  "
 		} else {

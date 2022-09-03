@@ -54,7 +54,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		if up.Backtrace {
 			fieldPrefix, progPrefix = "EntBt", "ent_bt"
 		}
-		suffix := fmt.Sprintf("_%x", up.Offset)
+		suffix := fmt.Sprintf("_%x", up.AbsOffset)
 		progName := progPrefix + suffix
 		structDefine.AddField(fieldPrefix+suffix, &ebpf.Program{}, fmt.Sprintf(`ebpf:"%s"`, progName))
 		spec.Programs[progName] = spec.Programs[progPrefix].Copy()
@@ -68,7 +68,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		bpfInsertIndex := 0
 		for bpfInsertIndex = range spec.Programs[progName].Instructions {
 			inst := spec.Programs[progName].Instructions[bpfInsertIndex]
-			if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R1 && inst.Offset == 0 {
+			if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R7 && inst.Offset == 0 {
 				break
 			}
 		}
@@ -78,7 +78,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 
 		for i, ins := range spec.Programs[progName].Instructions {
 			if ins.OpCode == 21 { // goto
-				if i < bpfInsertIndex {
+				if i < bpfInsertIndex && spec.Programs[progName].Instructions[i].Offset >= int16(bpfInsertIndex) {
 					spec.Programs[progName].Instructions[i].Offset += int16(len(instructions))
 				}
 			}
@@ -110,7 +110,7 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 		case uprobe.AtFramePointer:
 			suffix := ""
 			if len(up.FetchArgs) > 0 {
-				suffix = fmt.Sprintf("_%x", up.Offset)
+				suffix = fmt.Sprintf("_%x", up.AbsOffset)
 			}
 			if up.Backtrace {
 				prog = reader.GetField("EntBt" + suffix).Interface().(*ebpf.Program)
@@ -120,7 +120,7 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 		case uprobe.AtRet:
 			prog = reader.GetField("Ret").Interface().(*ebpf.Program)
 		}
-		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.Offset})
+		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.AbsOffset})
 		if err != nil {
 			return err
 		}

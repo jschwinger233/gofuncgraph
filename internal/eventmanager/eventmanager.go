@@ -2,6 +2,7 @@ package eventmanager
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/elastic/go-sysinfo"
@@ -27,9 +28,7 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
 	bootTime := host.Info().BootTime
 	uprobesMap := map[string]uprobe.Uprobe{}
 	for _, up := range uprobes {
-		if up.Location == uprobe.AtFramePointer {
-			uprobesMap[up.Funcname] = up
-		}
+		uprobesMap[fmt.Sprintf("%s+%d", up.Funcname, up.RelOffset)] = up
 	}
 	return &EventManager{
 		elf:              elf,
@@ -41,12 +40,12 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
 }
 
 func (p *EventManager) GetUprobe(event bpf.UfuncgraphEvent) (_ uprobe.Uprobe, err error) {
-	syms, _, err := p.elf.ResolveAddress(event.Ip)
+	syms, offset, err := p.elf.ResolveAddress(event.Ip)
 	if err != nil {
 		return
 	}
 	for _, sym := range syms {
-		uprobe, ok := p.uprobes[sym.Name]
+		uprobe, ok := p.uprobes[fmt.Sprintf("%s+%d", sym.Name, offset)]
 		if ok {
 			return uprobe, nil
 		}

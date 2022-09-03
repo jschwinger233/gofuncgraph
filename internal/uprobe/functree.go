@@ -10,12 +10,13 @@ import (
 )
 
 type FuncTree struct {
-	Name       string
-	EntOffset  uint64
-	FpOffset   uint64
-	RetOffsets []uint64
-	Children   []*FuncTree
-	Err        error
+	Name          string
+	EntOffset     uint64
+	FpOffset      uint64
+	CustomOffsets []uint64
+	RetOffsets    []uint64
+	Children      []*FuncTree
+	Err           error
 }
 
 func (t *FuncTree) Traverse(f func(int, *FuncTree, *FuncTree) bool) {
@@ -33,58 +34,39 @@ func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTre
 
 func (t *FuncTree) Print() {
 	t.Traverse(func(layer int, _, self *FuncTree) bool {
-		var (
-			entpoint  uint64
-			retpoints []string
-		)
-
+		var retpoints []string
 		indent := strings.Repeat(" ", layer*2)
-		entpoint = self.FpOffset
 		for _, ret := range self.RetOffsets {
 			retpoints = append(retpoints, fmt.Sprintf("%x", ret))
 		}
 
 		if self.Err == nil {
-			log.Infof("%s%s: %x %s\n", indent, self.Name, entpoint, retpoints)
+			log.Infof("%s%s(%x): %x %s\n", indent, self.Name, self.EntOffset, self.FpOffset, retpoints)
 		} else {
-			log.Warnf("%s%s: %s\n", indent, self.Name, self.Err)
+			log.Warnf("%s%s(%x): %s\n", indent, self.Name, self.EntOffset, self.Err)
 		}
 		return true
 	})
 }
 
-func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth int) (trees []*FuncTree, err error) {
-	funcnamesMatchedWildcards := func(wildcards []string) (funcnames []string, err error) {
-		symbols, _, err := elf.Symbols()
-		if err != nil {
-			return
-		}
-		for _, symbol := range symbols {
-			if debugelf.ST_TYPE(symbol.Info) == debugelf.STT_FUNC {
-				for _, wc := range wildcards {
-					if MatchWildcard(wc, symbol.Name) {
-						funcnames = append(funcnames, symbol.Name)
-						break
-					}
-				}
-			}
-		}
-		return
-	}
-
+func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth int, customOffsets map[string][]uint64) (trees []*FuncTree, err error) {
 	var parseFuncTree func(name string, depth int, ex []string) *FuncTree
 	parseFuncTree = func(name string, depth int, ex []string) (tree *FuncTree) {
 		tree = &FuncTree{Name: name}
+		for _, wc := range ex {
+			if MatchWildcard(wc, name) {
+				tree.Err = fmt.Errorf("excluded by %s", wc)
+				break
+			}
+		}
 		funcnames, err := elf.FuncCalledBy(name)
 		if err != nil {
 			tree.Err = err
 			return
 		}
-		offset, err := elf.FuncOffset(name)
-		if err != nil {
+		if tree.EntOffset, err = elf.FuncOffset(name); err != nil {
 			return
 		}
-		tree.EntOffset = offset
 		tree.FpOffset, tree.Err = elf.FuncFramePointerOffset(name)
 		if tree.Err != nil {
 			return
@@ -93,11 +75,8 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 		if tree.Err != nil {
 			return
 		}
-		for _, wc := range ex {
-			if MatchWildcard(wc, name) {
-				tree.Err = fmt.Errorf("excluded by %s", wc)
-				break
-			}
+		if _, ok := customOffsets[name]; ok {
+			tree.CustomOffsets = customOffsets[name]
 		}
 		if depth == 0 {
 			return
@@ -108,9 +87,20 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 		return
 	}
 
-	funcnames, err := funcnamesMatchedWildcards(wildcards)
+	funcnames := []string{}
+	symbols, _, err := elf.Symbols()
 	if err != nil {
 		return
+	}
+	for _, symbol := range symbols {
+		if debugelf.ST_TYPE(symbol.Info) == debugelf.STT_FUNC {
+			for _, wc := range wildcards {
+				if MatchWildcard(wc, symbol.Name) {
+					funcnames = append(funcnames, symbol.Name)
+					break
+				}
+			}
+		}
 	}
 
 	for _, funcname := range funcnames {

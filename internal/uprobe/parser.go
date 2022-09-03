@@ -5,11 +5,12 @@ import (
 )
 
 type ParseOptions struct {
-	Wildcards   []string
-	ExWildcards []string
-	Fetch       map[string]map[string]string
-	SearchDepth int
-	Backtrace   bool
+	Wildcards     []string
+	ExWildcards   []string
+	Fetch         map[string]map[string]string // funcname: varname: expression
+	CustomOffsets map[string][]uint64          // funcname: [rel_offset]
+	SearchDepth   int
+	Backtrace     bool
 }
 
 func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
@@ -18,7 +19,7 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 		return
 	}
 
-	funcTrees, err := parseFuncTrees(elf, opts.Wildcards, opts.ExWildcards, opts.SearchDepth)
+	funcTrees, err := parseFuncTrees(elf, opts.Wildcards, opts.ExWildcards, opts.SearchDepth, opts.CustomOffsets)
 	if err != nil {
 		return
 	}
@@ -38,16 +39,27 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 			uprobes = append(uprobes, Uprobe{
 				Funcname:      self.Name,
 				Location:      AtFramePointer,
-				Offset:        self.FpOffset,
+				AbsOffset:     self.FpOffset,
+				RelOffset:     self.FpOffset - self.EntOffset,
 				UserSpecified: userSpecified,
 				Backtrace:     userSpecified && opts.Backtrace,
 				FetchArgs:     fetchArgs[self.Name],
 			})
+			for _, off := range self.CustomOffsets {
+				uprobes = append(uprobes, Uprobe{
+					Funcname:  self.Name,
+					Location:  Custom,
+					AbsOffset: off,
+					RelOffset: off - self.EntOffset,
+					FetchArgs: fetchArgs[self.Name],
+				})
+			}
 			for _, off := range self.RetOffsets {
 				uprobes = append(uprobes, Uprobe{
-					Funcname: self.Name,
-					Location: AtRet,
-					Offset:   off,
+					Funcname:  self.Name,
+					Location:  AtRet,
+					AbsOffset: off,
+					RelOffset: off - self.EntOffset,
 				})
 			}
 			return true

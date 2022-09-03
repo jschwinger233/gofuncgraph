@@ -4,13 +4,15 @@ type UprobeLocation int
 
 const (
 	AtFramePointer UprobeLocation = iota
+	Custom
 	AtRet
 )
 
 type Uprobe struct {
 	Funcname                 string
+	AbsOffset                uint64
+	RelOffset                uint64
 	Location                 UprobeLocation
-	Offset                   uint64
 	UserSpecified, Backtrace bool
 	FetchArgs                []*FetchArg
 }
