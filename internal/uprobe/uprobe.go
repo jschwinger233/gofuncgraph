@@ -4,7 +4,7 @@ type UprobeLocation int
 
 const (
 	AtFramePointer UprobeLocation = iota
-	Custom
+	AtCustom
 	AtRet
 )
 

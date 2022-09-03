@@ -32,14 +32,22 @@ func (m *EventManager) Handle(event bpf.UfuncgraphEvent) (err error) {
 
 func (p *EventManager) Add(event bpf.UfuncgraphEvent) {
 	length := len(p.goroutine2events[event.StackId])
-	if length == 0 && event.Location == 1 {
+	if length == 0 && (event.Location == 1 || event.Location == 2) {
 		return
 	}
 	if event.StackDepth != 65535 && length > 0 && event.Location == 0 && p.goroutine2events[event.StackId][length-1].Location == 0 && p.goroutine2events[event.StackId][length-1].StackDepth == event.StackDepth && p.goroutine2events[event.StackId][length-1].Ip == event.Ip {
+		// duplicated entry event due to stack expansion
 		return
 	}
 	p.goroutine2events[event.StackId] = append(p.goroutine2events[event.StackId], event)
-	p.goroutine2stack[event.StackId] = p.goroutine2stack[event.StackId] - 2*uint64(event.Location) + 1
+	switch event.Location {
+	case 0:
+		p.goroutine2stack[event.StackId]++
+	case 1:
+		p.goroutine2stack[event.StackId]--
+	case 2:
+		// do nothing
+	}
 }
 
 func (p *EventManager) CloseStack(event bpf.UfuncgraphEvent) bool {

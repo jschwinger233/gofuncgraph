@@ -1,6 +1,8 @@
 package uprobe
 
 import (
+	"fmt"
+
 	"github.com/jschwinger233/ufuncgraph/elf"
 )
 
@@ -45,13 +47,13 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 				Backtrace:     userSpecified && opts.Backtrace,
 				FetchArgs:     fetchArgs[self.Name],
 			})
-			for _, off := range self.CustomOffsets {
+			for _, relOff := range self.CustomRelOffsets {
 				uprobes = append(uprobes, Uprobe{
 					Funcname:  self.Name,
-					Location:  Custom,
-					AbsOffset: off,
-					RelOffset: off - self.EntOffset,
-					FetchArgs: fetchArgs[self.Name],
+					Location:  AtCustom,
+					AbsOffset: relOff + self.EntOffset,
+					RelOffset: relOff,
+					FetchArgs: fetchArgs[fmt.Sprintf("%s+%d", self.Name, relOff)],
 				})
 			}
 			for _, off := range self.RetOffsets {

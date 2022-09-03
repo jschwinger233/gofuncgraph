@@ -36,6 +36,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	structDefine := dynamicstruct.NewStruct().
 		AddField("Ent", &ebpf.Program{}, `ebpf:"ent"`).
 		AddField("EntBt", &ebpf.Program{}, `ebpf:"ent_bt"`).
+		AddField("Custom", &ebpf.Program{}, `ebpf:"custom"`).
 		AddField("Ret", &ebpf.Program{}, `ebpf:"ret"`).
 		AddField("BpfStack", &ebpf.Map{}, `ebpf:"bpf_stack"`).
 		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`).
@@ -47,12 +48,15 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	}
 
 	for _, up := range uprobes {
-		if (up.Location != uprobe.AtFramePointer) || len(up.FetchArgs) == 0 {
+		if (up.Location == uprobe.AtRet) || len(up.FetchArgs) == 0 {
 			continue
 		}
 		fieldPrefix, progPrefix := "Ent", "ent"
+		if up.Location == uprobe.AtCustom {
+			fieldPrefix, progPrefix = "Custom", "custom"
+		}
 		if up.Backtrace {
-			fieldPrefix, progPrefix = "EntBt", "ent_bt"
+			fieldPrefix, progPrefix = fieldPrefix+"Bt", progPrefix+"_bt"
 		}
 		suffix := fmt.Sprintf("_%x", up.AbsOffset)
 		progName := progPrefix + suffix
@@ -117,6 +121,12 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 			} else {
 				prog = reader.GetField("Ent" + suffix).Interface().(*ebpf.Program)
 			}
+		case uprobe.AtCustom:
+			suffix := ""
+			if len(up.FetchArgs) > 0 {
+				suffix = fmt.Sprintf("_%x", up.AbsOffset)
+			}
+			prog = reader.GetField("Custom" + suffix).Interface().(*ebpf.Program)
 		case uprobe.AtRet:
 			prog = reader.GetField("Ret").Interface().(*ebpf.Program)
 		}

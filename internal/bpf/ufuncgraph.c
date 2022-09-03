@@ -9,6 +9,7 @@
 
 #define ENTPOINT 0
 #define RETPOINT 1
+#define CUSTOMPOINT 2
 
 #define STACKOVERFLOWERR 1
 
@@ -84,7 +85,7 @@ __u64 static new_stack_id() {
     return (*stack_id) | ((__u64)cpu << 32);
 }
 
-int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
+int static afterframepointer(struct pt_regs *ctx, __u8 bt, __u8 location) {
     __u32 key = 0;
     struct event *e = bpf_map_lookup_elem(&bpf_stack, &key);
     if (!e)
@@ -100,7 +101,7 @@ int static do_entpoint(struct pt_regs *ctx, __u8 bt) {
     // manipulation ends
 
     __u64 this_bp = ctx->rbp;
-    e->location = ENTPOINT;
+    e->location = location;
     e->ip = ctx->rip;
     e->time_ns = bpf_ktime_get_ns();
 
@@ -133,12 +134,17 @@ submit_event:
 
 SEC("uprobe/ent")
 int ent(struct pt_regs *ctx) {
-    return do_entpoint(ctx, 0);
+    return afterframepointer(ctx, 0, ENTPOINT);
 }
 
 SEC("uprobe/ent_bt")
 int ent_bt(struct pt_regs *ctx) {
-    return do_entpoint(ctx, 1);
+    return afterframepointer(ctx, 1, ENTPOINT);
+}
+
+SEC("uprobe/custom")
+int custom(struct pt_regs *ctx) {
+    return afterframepointer(ctx, 0, CUSTOMPOINT);
 }
 
 SEC("uprobe/ret")

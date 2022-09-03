@@ -98,6 +98,7 @@ func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]m
 				return
 			}
 			offsets[input[:idx]] = append(offsets[input[:idx]], offset)
+			input = input[:idx]
 		}
 
 		if input[0] == '!' {

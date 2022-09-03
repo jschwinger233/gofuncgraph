@@ -10,13 +10,13 @@ import (
 )
 
 type FuncTree struct {
-	Name          string
-	EntOffset     uint64
-	FpOffset      uint64
-	CustomOffsets []uint64
-	RetOffsets    []uint64
-	Children      []*FuncTree
-	Err           error
+	Name             string
+	EntOffset        uint64
+	FpOffset         uint64
+	CustomRelOffsets []uint64
+	RetOffsets       []uint64
+	Children         []*FuncTree
+	Err              error
 }
 
 func (t *FuncTree) Traverse(f func(int, *FuncTree, *FuncTree) bool) {
@@ -34,14 +34,17 @@ func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTre
 
 func (t *FuncTree) Print() {
 	t.Traverse(func(layer int, _, self *FuncTree) bool {
-		var retpoints []string
+		var retpoints, customs []string
 		indent := strings.Repeat(" ", layer*2)
 		for _, ret := range self.RetOffsets {
 			retpoints = append(retpoints, fmt.Sprintf("%x", ret))
 		}
+		for _, cus := range self.CustomRelOffsets {
+			customs = append(customs, fmt.Sprintf("+%d", cus))
+		}
 
 		if self.Err == nil {
-			log.Infof("%s%s(%x): %x %s\n", indent, self.Name, self.EntOffset, self.FpOffset, retpoints)
+			log.Infof("%s%s(%x): fp=%x rets=%s customs=%s\n", indent, self.Name, self.EntOffset, self.FpOffset, retpoints, customs)
 		} else {
 			log.Warnf("%s%s(%x): %s\n", indent, self.Name, self.EntOffset, self.Err)
 		}
@@ -75,8 +78,14 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 		if tree.Err != nil {
 			return
 		}
+		for _, wc := range ex {
+			if MatchWildcard(wc, name) {
+				tree.Err = fmt.Errorf("excluded by %s", wc)
+				break
+			}
+		}
 		if _, ok := customOffsets[name]; ok {
-			tree.CustomOffsets = customOffsets[name]
+			tree.CustomRelOffsets = customOffsets[name]
 		}
 		if depth == 0 {
 			return

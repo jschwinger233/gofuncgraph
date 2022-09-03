@@ -66,9 +66,10 @@ type UfuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type UfuncgraphProgramSpecs struct {
-	Ent   *ebpf.ProgramSpec `ebpf:"ent"`
-	EntBt *ebpf.ProgramSpec `ebpf:"ent_bt"`
-	Ret   *ebpf.ProgramSpec `ebpf:"ret"`
+	Custom *ebpf.ProgramSpec `ebpf:"custom"`
+	Ent    *ebpf.ProgramSpec `ebpf:"ent"`
+	EntBt  *ebpf.ProgramSpec `ebpf:"ent_bt"`
+	Ret    *ebpf.ProgramSpec `ebpf:"ret"`
 }
 
 // UfuncgraphMapSpecs contains maps before they are loaded into the kernel.
@@ -116,13 +117,15 @@ func (m *UfuncgraphMaps) Close() error {
 //
 // It can be passed to LoadUfuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type UfuncgraphPrograms struct {
-	Ent   *ebpf.Program `ebpf:"ent"`
-	EntBt *ebpf.Program `ebpf:"ent_bt"`
-	Ret   *ebpf.Program `ebpf:"ret"`
+	Custom *ebpf.Program `ebpf:"custom"`
+	Ent    *ebpf.Program `ebpf:"ent"`
+	EntBt  *ebpf.Program `ebpf:"ent_bt"`
+	Ret    *ebpf.Program `ebpf:"ret"`
 }
 
 func (p *UfuncgraphPrograms) Close() error {
 	return _UfuncgraphClose(
+		p.Custom,
 		p.Ent,
 		p.EntBt,
 		p.Ret,

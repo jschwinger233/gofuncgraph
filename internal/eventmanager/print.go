@@ -50,7 +50,9 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 		if err != nil {
 			return err
 		}
-		if event.Location == 0 {
+
+		switch event.Location {
+		case 0: // entpoint
 			startTimeStack = append(startTimeStack, event.TimeNs)
 			callChain, err := p.SprintCallChain(event)
 			if err != nil {
@@ -76,7 +78,8 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 				fmt.Printf("%s %8.4f %s %s+%d(%s) { %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(args, ", "), callChain)
 			}
 			indent += "  "
-		} else {
+
+		case 1: // retpoint
 			if len(indent) == 0 {
 				continue
 			}
@@ -84,6 +87,30 @@ func (p *EventManager) PrintStack(StackId uint64) (err error) {
 			startTimeStack = startTimeStack[:len(startTimeStack)-1]
 			indent = indent[:len(indent)-2]
 			fmt.Printf("%s %8.4f %s } %s+%d\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset)
+
+		case 2: // customepoint
+			if len(indent) == 0 {
+				continue
+			}
+			uprobe, err := p.GetUprobe(event)
+			if err != nil {
+				return err
+			}
+			sinceLastEvent := 0.
+			if lastEvent.TimeNs != 0 {
+				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
+			}
+			if len(uprobe.FetchArgs) == 0 {
+				fmt.Printf("%s %8.4f %s %s+%d\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset)
+			} else {
+				args := []string{}
+				data := event.Data[:]
+				for _, arg := range uprobe.FetchArgs {
+					args = append(args, arg.Sprint(data))
+					data = data[arg.Size:]
+				}
+				fmt.Printf("%s %8.4f %s %s+%d(%s)\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(args, ", "))
+			}
 		}
 
 		lastEvent = event
