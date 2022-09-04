@@ -72,7 +72,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		bpfInsertIndex := 0
 		for bpfInsertIndex = range spec.Programs[progName].Instructions {
 			inst := spec.Programs[progName].Instructions[bpfInsertIndex]
-			if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R7 && inst.Offset == 0 {
+			if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R7 && inst.Offset == 0 { // *(u64 *)(r6 + 0) = r7
 				break
 			}
 		}

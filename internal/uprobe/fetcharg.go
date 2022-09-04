@@ -250,9 +250,8 @@ func (op *ReadMemory) TargetSize() int16 {
 	return int16(op.size)
 }
 
-func (f *FetchArg) Sprint(data []uint8) string {
+func (f *FetchArg) SprintValue(data []uint8) (value string) {
 	data = data[:f.Size]
-	var value string
 	switch f.Type {
 	case "u8":
 		value = fmt.Sprintf("%d", data[0])
@@ -277,5 +276,5 @@ func (f *FetchArg) Sprint(data []uint8) string {
 	case "c8", "c16", "c32", "c64", "c128", "c256", "c512", "c1024":
 		value = string(data[:f.Size])
 	}
-	return fmt.Sprintf("%s=%s", f.Varname, value)
+	return
 }
