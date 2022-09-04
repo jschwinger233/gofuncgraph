@@ -44,8 +44,8 @@ func newFetchArg(varname, statement string) (_ *FetchArg, err error) {
 			return
 		}
 	case 'c':
-		if !(parts[1][1:] == "8" || parts[1][1:] == "16" || parts[1][1:] == "32" || parts[1][1:] == "64" || parts[1][1:] == "128" || parts[1][1:] == "256" || parts[1][1:] == "512" || parts[1][1:] == "1024") {
-			err = fmt.Errorf("only support 8/16/32/64/128/256 bits for c type: %s", parts[1])
+		if !(parts[1][1:] == "8" || parts[1][1:] == "16" || parts[1][1:] == "32" || parts[1][1:] == "64" || parts[1][1:] == "128" || parts[1][1:] == "256" || parts[1][1:] == "512") {
+			err = fmt.Errorf("only support 8/16/32/64/128/256/512 bits for c type: %s", parts[1])
 			return
 		}
 	default:
@@ -273,7 +273,7 @@ func (f *FetchArg) SprintValue(data []uint8) (value string) {
 		value = fmt.Sprintf("%f", float32(binary.LittleEndian.Uint32(data)))
 	case "f64":
 		value = fmt.Sprintf("%f", float64(binary.LittleEndian.Uint64(data)))
-	case "c8", "c16", "c32", "c64", "c128", "c256", "c512", "c1024":
+	case "c8", "c16", "c32", "c64", "c128", "c256", "c512":
 		value = string(data[:f.Size])
 	}
 	return

@@ -1,6 +1,8 @@
 package elf
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"golang.org/x/arch/x86/x86asm"
 )
@@ -13,24 +15,31 @@ func (e *ELF) FuncInstructions(name string) (insts []x86asm.Inst, addr, offset u
 	return e.ResolveInstructions(raw), addr, offset, nil
 }
 
-func (e *ELF) FuncCalledBy(funcname string) (called []string, err error) {
-	insts, addr, _, err := e.FuncInstructions(funcname)
+func (e *ELF) FuncCalledBy(funcname string) (calledRel []string, calledAbs map[uint64]string, err error) {
+	insts, addr, offset, err := e.FuncInstructions(funcname)
 	if err != nil {
 		return
 	}
 
+	calledAbs = map[uint64]string{}
 	for _, inst := range insts {
 		addr += uint64(inst.Len)
-		if inst.Op == x86asm.CALL && inst.Opcode>>24 == 0xe8 {
-			rel, ok := inst.Args[0].(x86asm.Rel)
-			if !ok {
-				continue
+		offset += uint64(inst.Len)
+		if inst.Op == x86asm.CALL {
+			switch inst.Opcode >> 24 {
+			case 0xe8:
+				rel, ok := inst.Args[0].(x86asm.Rel)
+				if !ok {
+					continue
+				}
+				syms, off, err := e.ResolveAddress(uint64(int64(addr) + int64(rel)))
+				if err != nil || off != 0 {
+					continue
+				}
+				calledRel = append(calledRel, syms[0].Name)
+			case 0xff:
+				calledAbs[offset-uint64(inst.Len)] = strings.ToLower(inst.Args[0].String())
 			}
-			syms, off, err := e.ResolveAddress(uint64(int64(addr) + int64(rel)))
-			if err != nil || off != 0 {
-				continue
-			}
-			called = append(called, syms[0].Name)
 		}
 	}
 	return

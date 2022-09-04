@@ -16,25 +16,26 @@ type FuncTree struct {
 	CustomRelOffsets []uint64
 	RetOffsets       []uint64
 	Children         []*FuncTree
+	CallRegs         map[uint64]string
 	Err              error
 }
 
 func (t *FuncTree) Traverse(f func(int, *FuncTree, *FuncTree) bool) {
-	t.Visit(0, nil, t, f)
+	t.visit(0, nil, t, f)
 }
 
-func (t *FuncTree) Visit(layer int, parent, self *FuncTree, f func(int, *FuncTree, *FuncTree) bool) {
+func (t *FuncTree) visit(layer int, parent, self *FuncTree, f func(int, *FuncTree, *FuncTree) bool) {
 	cont := f(layer, parent, self)
 	if cont {
 		for _, tree := range t.Children {
-			tree.Visit(layer+1, t, tree, f)
+			tree.visit(layer+1, t, tree, f)
 		}
 	}
 }
 
 func (t *FuncTree) Print() {
 	t.Traverse(func(layer int, _, self *FuncTree) bool {
-		var retpoints, customs []string
+		var retpoints, customs, regcalls []string
 		indent := strings.Repeat(" ", layer*2)
 		for _, ret := range self.RetOffsets {
 			retpoints = append(retpoints, fmt.Sprintf("+%x", ret-self.EntOffset))
@@ -42,9 +43,11 @@ func (t *FuncTree) Print() {
 		for _, cus := range self.CustomRelOffsets {
 			customs = append(customs, fmt.Sprintf("+%d", cus))
 		}
-
+		for off, regname := range self.CallRegs {
+			regcalls = append(regcalls, fmt.Sprintf("+%d:%s", off-self.EntOffset, regname))
+		}
 		if self.Err == nil {
-			log.Infof("%s%s(%x): fp=%x rets=%s customs=%s\n", indent, self.Name, self.EntOffset, self.FpOffset, retpoints, customs)
+			log.Infof("%s%s(%x): fp=%x rets=%s customs=%s regcalls=%s\n", indent, self.Name, self.EntOffset, self.FpOffset, retpoints, customs, regcalls)
 		} else {
 			log.Warnf("%s%s(%x): %s\n", indent, self.Name, self.EntOffset, self.Err)
 		}
@@ -61,11 +64,6 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 				tree.Err = fmt.Errorf("excluded by %s", wc)
 				break
 			}
-		}
-		funcnames, err := elf.FuncCalledBy(name)
-		if err != nil {
-			tree.Err = err
-			return
 		}
 		if tree.EntOffset, err = elf.FuncOffset(name); err != nil {
 			return
@@ -90,6 +88,12 @@ func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth i
 		if depth == 0 {
 			return
 		}
+		funcnames, regs, err := elf.FuncCalledBy(name)
+		if err != nil {
+			tree.Err = err
+			return
+		}
+		tree.CallRegs = regs
 		for _, funcname := range funcnames {
 			tree.Children = append(tree.Children, parseFuncTree(funcname, depth-1, ex))
 		}

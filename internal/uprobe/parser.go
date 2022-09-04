@@ -28,7 +28,6 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 
 	visited := map[string]interface{}{}
 	for _, tree := range funcTrees {
-		tree.Print()
 		tree.Traverse(func(layer int, parent, self *FuncTree) bool {
 			if _, ok := visited[self.Name]; ok {
 				return false
@@ -56,6 +55,20 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 					FetchArgs: fetchArgs[fmt.Sprintf("%s+%d", self.Name, relOff)],
 				})
 			}
+			for off, reg := range self.CallRegs {
+				arg, err := newFetchArg("__call__", fmt.Sprintf("%%%s:u64", reg))
+				if err != nil {
+					self.Err = err
+					continue
+				}
+				uprobes = append(uprobes, Uprobe{
+					Funcname:  self.Name,
+					Location:  AtCustom,
+					AbsOffset: off,
+					RelOffset: off - self.EntOffset,
+					FetchArgs: []*FetchArg{arg},
+				})
+			}
 			for _, off := range self.RetOffsets {
 				uprobes = append(uprobes, Uprobe{
 					Funcname:  self.Name,
@@ -66,6 +79,7 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 			}
 			return true
 		})
+		tree.Print()
 	}
 	return
 }
