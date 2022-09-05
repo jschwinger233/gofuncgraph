@@ -4,6 +4,7 @@ before:
 
 builds:
   - id: gofun
+    binary: gofun
     env:
       - CGO_ENABLED=0
     ldflags:
