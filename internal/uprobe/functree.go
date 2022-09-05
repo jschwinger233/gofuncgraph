@@ -38,7 +38,7 @@ func (t *FuncTree) Print() {
 		var retpoints, customs, regcalls []string
 		indent := strings.Repeat(" ", layer*2)
 		for _, ret := range self.RetOffsets {
-			retpoints = append(retpoints, fmt.Sprintf("+%x", ret-self.EntOffset))
+			retpoints = append(retpoints, fmt.Sprintf("+%d", ret-self.EntOffset))
 		}
 		for _, cus := range self.CustomRelOffsets {
 			customs = append(customs, fmt.Sprintf("+%d", cus))

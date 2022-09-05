@@ -76,7 +76,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 				break
 			}
 		}
-		bpfInsertIndex++
+		bpfInsertIndex += 2 // skip the "e->location = location" / "*(u8 *)(r6 + 34) = r1"
 
 		spec.Programs[progName].Instructions = append(spec.Programs[progName].Instructions[:bpfInsertIndex], append(instructions, spec.Programs[progName].Instructions[bpfInsertIndex:]...)...)
 
