@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jschwinger233/ufuncgraph/internal/bpf"
-	"github.com/jschwinger233/ufuncgraph/internal/uprobe"
+	"github.com/jschwinger233/gofuncgraph/internal/bpf"
+	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 )
 
 const (
 	placeholder = "        "
 )
 
-func (m *EventManager) SprintCallChain(event bpf.UfuncgraphEvent) (chain string, err error) {
+func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string, err error) {
 	calls := []string{}
 	syms, off, err := m.elf.ResolveAddress(event.CallerIp)
 	if err != nil {
@@ -45,7 +45,7 @@ func (m *EventManager) PrintStack(StackId uint64) (err error) {
 	indent := ""
 	fmt.Println()
 	startTimeStack := []uint64{}
-	var lastEvent bpf.UfuncgraphEvent
+	var lastEvent bpf.GofuncgraphEvent
 	for _, event := range m.goroutine2events[StackId] {
 		t := m.bootTime.Add(time.Duration(event.TimeNs)).Format("02 15:04:05.0000")
 		syms, offset, err := m.elf.ResolveAddress(event.Ip)

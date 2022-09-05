@@ -9,11 +9,11 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/link"
-	"github.com/jschwinger233/ufuncgraph/internal/uprobe"
+	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 	dynamicstruct "github.com/ompluscator/dynamic-struct"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event Ufuncgraph ./ufuncgraph.c -- -I./headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event Gofuncgraph ./gofuncgraph.c -- -I./headers
 
 const (
 	EventDataOffset int64 = 436
@@ -42,7 +42,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`).
 		AddField("Goids", &ebpf.Map{}, `ebpf:"goids"`)
 
-	spec, err := LoadUfuncgraph()
+	spec, err := LoadGofuncgraph()
 	if err != nil {
 		return err
 	}
@@ -146,14 +146,14 @@ func (b *BPF) Detach() {
 	}
 }
 
-func (b *BPF) PollEvents(ctx context.Context) chan UfuncgraphEvent {
-	ch := make(chan UfuncgraphEvent)
+func (b *BPF) PollEvents(ctx context.Context) chan GofuncgraphEvent {
+	ch := make(chan GofuncgraphEvent)
 
 	queue := dynamicstruct.NewReader(b.objs).GetField("EventQueue").Interface().(*ebpf.Map)
 	go func() {
 		defer close(ch)
 		for {
-			event := UfuncgraphEvent{}
+			event := GofuncgraphEvent{}
 			select {
 			case <-ctx.Done():
 				return

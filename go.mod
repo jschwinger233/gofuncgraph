@@ -1,4 +1,4 @@
-module github.com/jschwinger233/ufuncgraph
+module github.com/jschwinger233/gofuncgraph
 
 go 1.18
 

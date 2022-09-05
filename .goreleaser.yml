@@ -3,13 +3,13 @@ before:
     - go mod download
 
 builds:
-  - id: ufuncgraph
+  - id: gofun
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -X github.com/jschwinger233/ufuncgraph/version.REVISION={{.Commit}}
-      - -X github.com/jschwinger233/ufuncgraph/version.VERSION={{.Env.VERSION}}
-      - -X github.com/jschwinger233/ufuncgraph/version.BUILTAT={{.Date}}
+      - -X github.com/jschwinger233/gofuncgraph/version.REVISION={{.Commit}}
+      - -X github.com/jschwinger233/gofuncgraph/version.VERSION={{.Env.VERSION}}
+      - -X github.com/jschwinger233/gofuncgraph/version.BUILTAT={{.Date}}
     goos:
       - linux
     goarch:

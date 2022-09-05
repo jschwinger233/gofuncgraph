@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jschwinger233/ufuncgraph/elf"
-	"github.com/jschwinger233/ufuncgraph/internal/bpf"
-	"github.com/jschwinger233/ufuncgraph/internal/eventmanager"
-	"github.com/jschwinger233/ufuncgraph/internal/uprobe"
+	"github.com/jschwinger233/gofuncgraph/elf"
+	"github.com/jschwinger233/gofuncgraph/internal/bpf"
+	"github.com/jschwinger233/gofuncgraph/internal/eventmanager"
+	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 	log "github.com/sirupsen/logrus"
 )
 

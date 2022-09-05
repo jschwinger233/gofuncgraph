@@ -8,7 +8,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/jschwinger233/ufuncgraph/version"
+	"github.com/jschwinger233/gofuncgraph/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
@@ -37,20 +37,20 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name: "ufuncgraph",
+		Name: "gofun",
 		// TODO@zc: kernel version
 		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for userspace! \n(only non-stripped static-linking Golang on x86-64 little-endian Linux is supported for now)",
 		UsageText: `example: trace a specific function in etcd client "go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire"
-  ufuncgraph ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
+  gofunc ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
 
 example: trace all functions in etcd client
-  ufuncgraph ./bin 'go.etcd.io/etcd/client/v3/*'
+  gofunc ./bin 'go.etcd.io/etcd/client/v3/*'
 
 example: trace a specific function and its downstream functions within 3 layers, but exclude the golang builtins
-  ufuncgraph --depth 3 ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' '!runtime.*'
+  gofunc --depth 3 ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' '!runtime.*'
 
 example: trace a specific function with some arguemnts and backtrace
-  ufuncgraph --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%ax):u64, myKey=+0(+24(%rax)):c128)'
+  gofunc --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%ax):u64, myKey=+0(+24(%rax)):c128)'
  `,
 		Version: version.VERSION,
 		Flags: []cli.Flag{

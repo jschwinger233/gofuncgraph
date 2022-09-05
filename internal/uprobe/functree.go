@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jschwinger233/ufuncgraph/elf"
+	"github.com/jschwinger233/gofuncgraph/elf"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -3,7 +3,7 @@ package uprobe
 import (
 	"fmt"
 
-	"github.com/jschwinger233/ufuncgraph/elf"
+	"github.com/jschwinger233/gofuncgraph/elf"
 )
 
 type ParseOptions struct {

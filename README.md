@@ -1,4 +1,4 @@
-# ufuncgraph
+# gofuncgraph
 
 bpf(2)-based ftrace(1)-like function graph tracer for userspace processes.
 
@@ -17,7 +17,7 @@ Let's trace dockerd to see how it handles `docker stop`:
 Type the command:
 
 ```bash
-sudo ufuncgraph -d 1 ./bundles/binary-daemon/dockerd '!runtime.*' '!context.*' '!*vendor*' 'github.com/docker/docker/daemon.(*Daemon).containerStop(id=+0(+64(%rdi)):c256, name=+0(+200(%rdi)):c256, name_len=+208(%rdi):s32)'
+sudo gofun -d 1 ./bundles/binary-daemon/dockerd '!runtime.*' '!context.*' '!*vendor*' 'github.com/docker/docker/daemon.(*Daemon).containerStop(id=+0(+64(%rdi)):c256, name=+0(+200(%rdi)):c256, name_len=+208(%rdi):s32)'
 ```
 
 Explanations:
@@ -30,7 +30,7 @@ Explanations:
 
 And will get the results:
 
-![docker-stop-tracing](https://raw.githubusercontent.com/jschwinger233/ufuncgraph/master/assets/docker-stop-tracing.jpg)
+![docker-stop-tracing](https://raw.githubusercontent.com/jschwinger233/gofuncgraph/master/assets/docker-stop-tracing.jpg)
 
 # Use cases
 

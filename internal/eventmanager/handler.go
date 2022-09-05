@@ -3,11 +3,11 @@ package eventmanager
 import (
 	"fmt"
 
-	"github.com/jschwinger233/ufuncgraph/internal/bpf"
+	"github.com/jschwinger233/gofuncgraph/internal/bpf"
 	log "github.com/sirupsen/logrus"
 )
 
-func (m *EventManager) Handle(event bpf.UfuncgraphEvent) (err error) {
+func (m *EventManager) Handle(event bpf.GofuncgraphEvent) (err error) {
 	if event.Errno != 0 {
 		return fmt.Errorf("event error: %d", event.Errno)
 	}
@@ -30,7 +30,7 @@ func (m *EventManager) Handle(event bpf.UfuncgraphEvent) (err error) {
 	return
 }
 
-func (p *EventManager) Add(event bpf.UfuncgraphEvent) {
+func (p *EventManager) Add(event bpf.GofuncgraphEvent) {
 	length := len(p.goroutine2events[event.StackId])
 	if length == 0 && (event.Location == 1 || event.Location == 2) {
 		return
@@ -50,16 +50,16 @@ func (p *EventManager) Add(event bpf.UfuncgraphEvent) {
 	}
 }
 
-func (p *EventManager) CloseStack(event bpf.UfuncgraphEvent) bool {
+func (p *EventManager) CloseStack(event bpf.GofuncgraphEvent) bool {
 	return p.goroutine2stack[event.StackId] == 0 && len(p.goroutine2events[event.StackId]) > 0
 }
 
-func (p *EventManager) ClearStack(event bpf.UfuncgraphEvent) {
+func (p *EventManager) ClearStack(event bpf.GofuncgraphEvent) {
 	delete(p.goroutine2events, event.StackId)
 	delete(p.goroutine2stack, event.StackId)
 }
 
-func (p *EventManager) UserSpecified(event bpf.UfuncgraphEvent) (_ bool, err error) {
+func (p *EventManager) UserSpecified(event bpf.GofuncgraphEvent) (_ bool, err error) {
 	uprobe, err := p.GetUprobe(event)
 	if err != nil {
 		return
