@@ -39,18 +39,20 @@ func main() {
 	app := &cli.App{
 		Name: "gofun",
 		// TODO@zc: kernel version
-		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for userspace! \n(only non-stripped static-linking Golang on x86-64 little-endian Linux is supported for now)",
+		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for Go! \n(only non-stripped non-PIE-built Golang ELF on x86-64 little-endian Linux is supported for now)",
 		UsageText: `example: trace a specific function in etcd client "go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire"
-  gofunc ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
+  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
 
 example: trace all functions in etcd client
-  gofunc ./bin 'go.etcd.io/etcd/client/v3/*'
+  gofun ./bin 'go.etcd.io/etcd/client/v3/*'
 
 example: trace a specific function and its downstream functions within 3 layers, but exclude the golang builtins
-  gofunc --depth 3 ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' '!runtime.*'
+  gofun --depth 3 ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' '!runtime.*'
 
 example: trace a specific function with some arguemnts and backtrace
-  gofunc --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%ax):u64, myKey=+0(+24(%rax)):c128)'
+  gofun --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%rax):u64, myKey=+0(+24(%rax)):c128)'
+
+For more details, please refer to https://github.com/jschwinger233/gofuncgraph/blob/main/README.md
  `,
 		Version: version.VERSION,
 		Flags: []cli.Flag{
