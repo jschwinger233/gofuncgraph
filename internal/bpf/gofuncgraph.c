@@ -1,7 +1,7 @@
 // +build ignore
 
-#include "common.h"
-#include "bpf_tracing.h"
+#include "vmlinux.h"
+#include "bpf_helpers.h"
 
 #define MAX_STACK_LAYERS 1000
 #define MAX_BT_LAYERS 50
@@ -97,24 +97,24 @@ int static afterframepointer(struct pt_regs *ctx, __u8 bt, __u8 location) {
     //__u8 c;
     //bpf_probe_read_user(&b, sizeof(a), (void*)a);
     //bpf_probe_read_user(&e->data, 8, (void*)a);
-    //__builtin_memcpy(&e->data, &ctx->rax, 4);
+    //__builtin_memcpy(&e->data, &ctx->ax, 4);
     // manipulation ends
 
-    __u64 this_bp = ctx->rbp;
+    __u64 this_bp = ctx->bp;
     e->location = location;
-    e->ip = ctx->rip;
+    e->ip = ctx->ip;
     e->time_ns = bpf_ktime_get_ns();
 
     void *ra;
-    ra = (void*)ctx->rbp+8;
+    ra = (void*)ctx->bp+8;
     bpf_probe_read_user(&e->caller_ip, sizeof(e->caller_ip), ra);
 
     __u64 caller_bp;
-    bpf_probe_read_user(&caller_bp, sizeof(caller_bp), (void*)ctx->rbp);
+    bpf_probe_read_user(&caller_bp, sizeof(caller_bp), (void*)ctx->bp);
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));
-    backtrace(ctx->rbp, &walk, e->bt, bt);
+    backtrace(ctx->bp, &walk, e->bt, bt);
     e->stack_depth = walk.depth;
     e->stack_id = walk.stack_id;
     if (walk.depth == 0xffffffffffffffff) {
@@ -155,10 +155,10 @@ int ret(struct pt_regs *ctx) {
         return 0; // should not happen
     __builtin_memset(e, 0, sizeof(*e));
     e->location = RETPOINT;
-    e->ip = ctx->rip;
+    e->ip = ctx->ip;
     e->time_ns = bpf_ktime_get_ns();
 
-    __u64 this_bp = ctx->rsp - 8;
+    __u64 this_bp = ctx->sp - 8;
 
     struct stackwalk walk;
     __builtin_memset(&walk, 0, sizeof(walk));

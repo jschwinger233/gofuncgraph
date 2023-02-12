@@ -40,9 +40,9 @@ func LoadGofuncgraph() (*ebpf.CollectionSpec, error) {
 //
 // The following types are suitable as obj argument:
 //
-//     *GofuncgraphObjects
-//     *GofuncgraphPrograms
-//     *GofuncgraphMaps
+//	*GofuncgraphObjects
+//	*GofuncgraphPrograms
+//	*GofuncgraphMaps
 //
 // See ebpf.CollectionSpec.LoadAndAssign documentation for details.
 func LoadGofuncgraphObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
@@ -142,5 +142,6 @@ func _GofuncgraphClose(closers ...io.Closer) error {
 }
 
 // Do not access this directly.
+//
 //go:embed gofuncgraph_bpfel_x86.o
 var _GofuncgraphBytes []byte
