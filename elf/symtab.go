@@ -30,7 +30,7 @@ func (f *ELF) Symbols() (symbols []elf.Symbol, symnames map[string]elf.Symbol, e
 
 func (f *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err error) {
 	if addr == 0 {
-		err = errors.WithMessage(SymbolNotFoundError, "0")
+		err = errors.Wrapf(SymbolNotFoundError, "0")
 		return
 	}
 	symbols, _, err := f.Symbols()

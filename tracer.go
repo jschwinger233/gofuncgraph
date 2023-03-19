@@ -25,27 +25,23 @@ func init() {
 }
 
 type Tracer struct {
-	bin       string
-	elf       *elf.ELF
-	args      []string
-	backtrace bool
-	depth     int
+	bin  string
+	elf  *elf.ELF
+	args []string
 
 	bpf *bpf.BPF
 }
 
-func NewTracer(bin string, args []string, backtrace bool, depth int) (_ *Tracer, err error) {
+func NewTracer(bin string, args []string) (_ *Tracer, err error) {
 	elf, err := elf.New(bin)
 	if err != nil {
 		return
 	}
 
 	return &Tracer{
-		bin:       bin,
-		elf:       elf,
-		args:      args,
-		backtrace: backtrace,
-		depth:     depth,
+		bin:  bin,
+		elf:  elf,
+		args: args,
 
 		bpf: bpf.New(),
 	}, nil
@@ -120,8 +116,6 @@ func (t *Tracer) Start() (err error) {
 		ExWildcards:   ex,
 		Fetch:         fetch,
 		CustomOffsets: offsets,
-		SearchDepth:   t.depth,
-		Backtrace:     t.backtrace,
 	})
 	if err != nil {
 		return

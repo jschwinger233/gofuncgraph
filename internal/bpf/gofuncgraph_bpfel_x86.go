@@ -14,15 +14,14 @@ import (
 )
 
 type GofuncgraphEvent struct {
-	StackId    uint64
-	CallerIp   uint64
-	Ip         uint64
-	TimeNs     uint64
-	StackDepth uint16
-	Location   uint8
-	Errno      uint8
-	Bt         [400]uint8
-	Data       [100]uint8
+	Goid     uint64
+	CallerIp uint64
+	Ip       uint64
+	TimeNs   uint64
+	Location uint8
+	Errno    uint8
+	Data     [100]uint8
+	_        [2]byte
 }
 
 // LoadGofuncgraph returns the embedded CollectionSpec for Gofuncgraph.
@@ -66,10 +65,8 @@ type GofuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GofuncgraphProgramSpecs struct {
-	Custom *ebpf.ProgramSpec `ebpf:"custom"`
-	Ent    *ebpf.ProgramSpec `ebpf:"ent"`
-	EntBt  *ebpf.ProgramSpec `ebpf:"ent_bt"`
-	Ret    *ebpf.ProgramSpec `ebpf:"ret"`
+	Ent *ebpf.ProgramSpec `ebpf:"ent"`
+	Ret *ebpf.ProgramSpec `ebpf:"ret"`
 }
 
 // GofuncgraphMapSpecs contains maps before they are loaded into the kernel.
@@ -78,7 +75,7 @@ type GofuncgraphProgramSpecs struct {
 type GofuncgraphMapSpecs struct {
 	BpfStack   *ebpf.MapSpec `ebpf:"bpf_stack"`
 	EventQueue *ebpf.MapSpec `ebpf:"event_queue"`
-	Goids      *ebpf.MapSpec `ebpf:"goids"`
+	Heap       *ebpf.MapSpec `ebpf:"heap"`
 }
 
 // GofuncgraphObjects contains all objects after they have been loaded into the kernel.
@@ -102,14 +99,14 @@ func (o *GofuncgraphObjects) Close() error {
 type GofuncgraphMaps struct {
 	BpfStack   *ebpf.Map `ebpf:"bpf_stack"`
 	EventQueue *ebpf.Map `ebpf:"event_queue"`
-	Goids      *ebpf.Map `ebpf:"goids"`
+	Heap       *ebpf.Map `ebpf:"heap"`
 }
 
 func (m *GofuncgraphMaps) Close() error {
 	return _GofuncgraphClose(
 		m.BpfStack,
 		m.EventQueue,
-		m.Goids,
+		m.Heap,
 	)
 }
 
@@ -117,17 +114,13 @@ func (m *GofuncgraphMaps) Close() error {
 //
 // It can be passed to LoadGofuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GofuncgraphPrograms struct {
-	Custom *ebpf.Program `ebpf:"custom"`
-	Ent    *ebpf.Program `ebpf:"ent"`
-	EntBt  *ebpf.Program `ebpf:"ent_bt"`
-	Ret    *ebpf.Program `ebpf:"ret"`
+	Ent *ebpf.Program `ebpf:"ent"`
+	Ret *ebpf.Program `ebpf:"ret"`
 }
 
 func (p *GofuncgraphPrograms) Close() error {
 	return _GofuncgraphClose(
-		p.Custom,
 		p.Ent,
-		p.EntBt,
 		p.Ret,
 	)
 }

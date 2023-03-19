@@ -1,7 +1,7 @@
 package uprobe
 
 import (
-	"fmt"
+	debugelf "debug/elf"
 
 	"github.com/jschwinger233/gofuncgraph/elf"
 )
@@ -11,75 +11,54 @@ type ParseOptions struct {
 	ExWildcards   []string
 	Fetch         map[string]map[string]string // funcname: varname: expression
 	CustomOffsets map[string][]uint64          // funcname: [rel_offset]
-	SearchDepth   int
-	Backtrace     bool
 }
 
 func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
-	fetchArgs, err := parseFetchArgs(opts.Fetch)
+	if _, err = parseFetchArgs(opts.Fetch); err != nil {
+		return
+	}
+
+	symbols, _, err := elf.Symbols()
 	if err != nil {
 		return
 	}
 
-	funcTrees, err := parseFuncTrees(elf, opts.Wildcards, opts.ExWildcards, opts.SearchDepth, opts.CustomOffsets)
-	if err != nil {
-		return
-	}
-
-	visited := map[string]interface{}{}
-	for _, tree := range funcTrees {
-		tree.Traverse(func(layer int, parent, self *FuncTree) bool {
-			if _, ok := visited[self.Name]; ok {
-				return false
-			}
-			visited[self.Name] = nil
-			userSpecified := layer == 0
-			if self.Err != nil {
-				return true
-			}
-			uprobes = append(uprobes, Uprobe{
-				Funcname:      self.Name,
-				Location:      AtFramePointer,
-				AbsOffset:     self.FpOffset,
-				RelOffset:     self.FpOffset - self.EntOffset,
-				UserSpecified: userSpecified,
-				Backtrace:     userSpecified && opts.Backtrace,
-				FetchArgs:     fetchArgs[self.Name],
-			})
-			for _, relOff := range self.CustomRelOffsets {
-				uprobes = append(uprobes, Uprobe{
-					Funcname:  self.Name,
-					Location:  AtCustom,
-					AbsOffset: relOff + self.EntOffset,
-					RelOffset: relOff,
-					FetchArgs: fetchArgs[fmt.Sprintf("%s+%d", self.Name, relOff)],
-				})
-			}
-			for off, reg := range self.CallRegs {
-				arg, err := newFetchArg("__call__", fmt.Sprintf("%%%s:u64", reg))
-				if err != nil {
-					self.Err = err
-					continue
+	funcnames := []string{}
+	for _, symbol := range symbols {
+		if debugelf.ST_TYPE(symbol.Info) == debugelf.STT_FUNC {
+			for _, wc := range opts.Wildcards {
+				if MatchWildcard(wc, symbol.Name) {
+					funcnames = append(funcnames, symbol.Name)
+					break
 				}
-				uprobes = append(uprobes, Uprobe{
-					Funcname:  self.Name,
-					Location:  AtCustom,
-					AbsOffset: off,
-					RelOffset: off - self.EntOffset,
-					FetchArgs: []*FetchArg{arg},
-				})
 			}
-			for _, off := range self.RetOffsets {
-				uprobes = append(uprobes, Uprobe{
-					Funcname:  self.Name,
-					Location:  AtRet,
-					AbsOffset: off,
-					RelOffset: off - self.EntOffset,
-				})
-			}
-			return true
+		}
+	}
+
+	for _, funcname := range funcnames {
+		entOffset, err := elf.FuncOffset(funcname)
+		if err != nil {
+			return nil, err
+		}
+		uprobes = append(uprobes, Uprobe{
+			Funcname:  funcname,
+			Location:  AtEntry,
+			AbsOffset: entOffset,
+			RelOffset: 0,
 		})
-		tree.Print()
+
+		retOffsets, err := elf.FuncRetOffsets(funcname)
+		if err != nil {
+			return nil, err
+		}
+		for _, retOffset := range retOffsets {
+			uprobes = append(uprobes, Uprobe{
+				Funcname:  funcname,
+				Location:  AtRet,
+				AbsOffset: retOffset,
+				RelOffset: retOffset - entOffset,
+			})
+		}
 	}
 	return
 }

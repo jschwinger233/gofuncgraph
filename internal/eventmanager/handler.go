@@ -15,14 +15,8 @@ func (m *EventManager) Handle(event bpf.GofuncgraphEvent) (err error) {
 	m.Add(event)
 	log.Debugf("added event: %+v", event)
 	if m.CloseStack(event) {
-		userSpecified, err := m.UserSpecified(m.goroutine2events[event.StackId][0])
-		if err != nil {
+		if err = m.PrintStack(event.Goid); err != nil {
 			return err
-		}
-		if userSpecified {
-			if err = m.PrintStack(event.StackId); err != nil {
-				return err
-			}
 		}
 		m.ClearStack(event)
 	}
@@ -31,38 +25,30 @@ func (m *EventManager) Handle(event bpf.GofuncgraphEvent) (err error) {
 }
 
 func (p *EventManager) Add(event bpf.GofuncgraphEvent) {
-	length := len(p.goroutine2events[event.StackId])
+	length := len(p.goroutine2events[event.Goid])
 	if length == 0 && (event.Location == 1 || event.Location == 2) {
 		return
 	}
-	if event.StackDepth != 65535 && length > 0 && event.Location == 0 && p.goroutine2events[event.StackId][length-1].Location == 0 && p.goroutine2events[event.StackId][length-1].StackDepth == event.StackDepth && p.goroutine2events[event.StackId][length-1].Ip == event.Ip {
-		// duplicated entry event due to stack expansion
-		return
-	}
-	p.goroutine2events[event.StackId] = append(p.goroutine2events[event.StackId], event)
+	// duplicated entry event due to stack expansion
+	//if event.StackDepth != 65535 && length > 0 && event.Location == 0 && p.goroutine2events[event.Goid][length-1].Location == 0 && p.goroutine2events[event.Goid][length-1].StackDepth == event.StackDepth && p.goroutine2events[event.Goid][length-1].Ip == event.Ip {
+	//return
+	//}
+	p.goroutine2events[event.Goid] = append(p.goroutine2events[event.Goid], event)
 	switch event.Location {
 	case 0:
-		p.goroutine2stack[event.StackId]++
+		p.goroutine2stack[event.Goid]++
 	case 1:
-		p.goroutine2stack[event.StackId]--
+		p.goroutine2stack[event.Goid]--
 	case 2:
 		// do nothing
 	}
 }
 
 func (p *EventManager) CloseStack(event bpf.GofuncgraphEvent) bool {
-	return p.goroutine2stack[event.StackId] == 0 && len(p.goroutine2events[event.StackId]) > 0
+	return p.goroutine2stack[event.Goid] == 0 && len(p.goroutine2events[event.Goid]) > 0
 }
 
 func (p *EventManager) ClearStack(event bpf.GofuncgraphEvent) {
-	delete(p.goroutine2events, event.StackId)
-	delete(p.goroutine2stack, event.StackId)
-}
-
-func (p *EventManager) UserSpecified(event bpf.GofuncgraphEvent) (_ bool, err error) {
-	uprobe, err := p.GetUprobe(event)
-	if err != nil {
-		return
-	}
-	return uprobe.UserSpecified, nil
+	delete(p.goroutine2events, event.Goid)
+	delete(p.goroutine2stack, event.Goid)
 }

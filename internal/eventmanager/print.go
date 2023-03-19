@@ -1,7 +1,6 @@
 package eventmanager
 
 import (
-	"encoding/binary"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,29 +15,14 @@ const (
 )
 
 func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string, err error) {
-	calls := []string{}
+	if event.CallerIp == 0 {
+		return "", nil
+	}
 	syms, off, err := m.elf.ResolveAddress(event.CallerIp)
 	if err != nil {
 		return
 	}
-	calls = append(calls, fmt.Sprintf("%s+%d", syms[0].Name, off))
-	offset := 0
-	for {
-		ip := binary.LittleEndian.Uint64(event.Bt[offset : offset+8])
-		if ip == 0 {
-			break
-		}
-		offset += 8
-		if offset >= len(event.Bt) {
-			break
-		}
-		syms, off, err := m.elf.ResolveAddress(ip)
-		if err != nil {
-			return "", err
-		}
-		calls = append(calls, fmt.Sprintf("%s+%d", syms[0].Name, off))
-	}
-	return strings.Join(calls, " > "), nil
+	return fmt.Sprintf("%s+%d", syms[0].Name, off), nil
 }
 
 func (m *EventManager) PrintStack(StackId uint64) (err error) {

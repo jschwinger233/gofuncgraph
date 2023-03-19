@@ -57,18 +57,6 @@ For more details, please refer to https://github.com/jschwinger233/gofuncgraph/b
 		Version: version.VERSION,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:    "backtrace",
-				Aliases: []string{"b"},
-				Value:   false,
-				Usage:   "backtrace, show the stack chains",
-			},
-			&cli.IntFlag{
-				Name:    "depth",
-				Aliases: []string{"d"},
-				Value:   0,
-				Usage:   "uprobe search depth",
-			},
-			&cli.BoolFlag{
 				Name:  "debug",
 				Value: false,
 				Usage: "enable debug logging",
@@ -81,7 +69,6 @@ For more details, please refer to https://github.com/jschwinger233/gofuncgraph/b
 			return nil
 		},
 		Action: func(ctx *cli.Context) (err error) {
-			backtrace, depth := ctx.Bool("backtrace"), ctx.Int("depth")
 			bin := ctx.Args().First()
 			args := ctx.Args().Tail()
 
@@ -89,7 +76,7 @@ For more details, please refer to https://github.com/jschwinger233/gofuncgraph/b
 				return cli.ShowAppHelp(ctx)
 			}
 
-			tracer, err := NewTracer(bin, args, backtrace, depth)
+			tracer, err := NewTracer(bin, args)
 			if err != nil {
 				return
 			}
@@ -97,6 +84,6 @@ For more details, please refer to https://github.com/jschwinger233/gofuncgraph/b
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		log.Fatalf("%+v", err)
 	}
 }

@@ -1,11 +1,9 @@
 package uprobe
 
 import (
-	debugelf "debug/elf"
 	"fmt"
 	"strings"
 
-	"github.com/jschwinger233/gofuncgraph/elf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,71 +51,4 @@ func (t *FuncTree) Print() {
 		}
 		return true
 	})
-}
-
-func parseFuncTrees(elf *elf.ELF, wildcards, exWildcards []string, searchDepth int, customOffsets map[string][]uint64) (trees []*FuncTree, err error) {
-	var parseFuncTree func(name string, depth int, ex []string) *FuncTree
-	parseFuncTree = func(name string, depth int, ex []string) (tree *FuncTree) {
-		tree = &FuncTree{Name: name}
-		for _, wc := range ex {
-			if MatchWildcard(wc, name) {
-				tree.Err = fmt.Errorf("excluded by %s", wc)
-				break
-			}
-		}
-		if tree.EntOffset, err = elf.FuncOffset(name); err != nil {
-			return
-		}
-		tree.FpOffset, tree.Err = elf.FuncFramePointerOffset(name)
-		if tree.Err != nil {
-			return
-		}
-		tree.RetOffsets, tree.Err = elf.FuncRetOffsets(name)
-		if tree.Err != nil {
-			return
-		}
-		for _, wc := range ex {
-			if MatchWildcard(wc, name) {
-				tree.Err = fmt.Errorf("excluded by %s", wc)
-				break
-			}
-		}
-		if _, ok := customOffsets[name]; ok {
-			tree.CustomRelOffsets = customOffsets[name]
-		}
-		if depth == 0 {
-			return
-		}
-		funcnames, regs, err := elf.FuncCalledBy(name)
-		if err != nil {
-			tree.Err = err
-			return
-		}
-		tree.CallRegs = regs
-		for _, funcname := range funcnames {
-			tree.Children = append(tree.Children, parseFuncTree(funcname, depth-1, ex))
-		}
-		return
-	}
-
-	funcnames := []string{}
-	symbols, _, err := elf.Symbols()
-	if err != nil {
-		return
-	}
-	for _, symbol := range symbols {
-		if debugelf.ST_TYPE(symbol.Info) == debugelf.STT_FUNC {
-			for _, wc := range wildcards {
-				if MatchWildcard(wc, symbol.Name) {
-					funcnames = append(funcnames, symbol.Name)
-					break
-				}
-			}
-		}
-	}
-
-	for _, funcname := range funcnames {
-		trees = append(trees, parseFuncTree(funcname, searchDepth, exWildcards))
-	}
-	return
 }
