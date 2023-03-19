@@ -35,9 +35,8 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 	structDefine := dynamicstruct.NewStruct().
 		AddField("Ent", &ebpf.Program{}, `ebpf:"ent"`).
 		AddField("Ret", &ebpf.Program{}, `ebpf:"ret"`).
-		AddField("BpfStack", &ebpf.Map{}, `ebpf:"bpf_stack"`).
-		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`).
-		AddField("Heap", &ebpf.Map{}, `ebpf:"heap"`)
+		AddField("EventStack", &ebpf.Map{}, `ebpf:"event_stack"`).
+		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`)
 
 	spec, err := LoadGofuncgraph()
 	if err != nil {
@@ -89,8 +88,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		}
 		reader := dynamicstruct.NewReader(b.objs)
 		b.closers = append(b.closers, reader.GetField("EventQueue").Interface().(*ebpf.Map))
-		b.closers = append(b.closers, reader.GetField("BpfStack").Interface().(*ebpf.Map))
-		b.closers = append(b.closers, reader.GetField("Heap").Interface().(*ebpf.Map))
+		b.closers = append(b.closers, reader.GetField("EventStack").Interface().(*ebpf.Map))
 	}()
 	return spec.LoadAndAssign(b.objs, nil)
 }
