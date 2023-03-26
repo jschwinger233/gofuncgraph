@@ -13,6 +13,20 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type GofuncgraphArgRule struct {
+	Type    uint8
+	Reg     uint8
+	Size    uint8
+	Length  uint8
+	Offsets [8]int16
+}
+
+type GofuncgraphArgRules struct {
+	Length uint8
+	_      [1]byte
+	Rules  [8]GofuncgraphArgRule
+}
+
 type GofuncgraphEvent struct {
 	Goid     uint64
 	Ip       uint64

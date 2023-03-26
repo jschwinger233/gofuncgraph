@@ -32,20 +32,22 @@ struct event {
 };
 
 // force emitting struct event into the ELF.
-const struct event *unused __attribute__((unused));
+const struct event *_ __attribute__((unused));
 
 struct arg_rule {
 	__u8 type;
 	__u8 reg;
 	__u8 size;
 	__u8 length;
-	signed char offsets[8];
+	__s16 offsets[8];
 };
 
 struct arg_rules {
 	__u8 length;
 	struct arg_rule rules[8];
 };
+
+const struct arg_rules *__ __attribute__((unused));
 
 struct arg_data {
 	__u64 goid;

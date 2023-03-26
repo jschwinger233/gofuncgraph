@@ -14,7 +14,8 @@ type ParseOptions struct {
 }
 
 func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
-	if _, err = parseFetchArgs(opts.Fetch); err != nil {
+	fetchArgs, err := parseFetchArgs(opts.Fetch)
+	if err != nil {
 		return
 	}
 
@@ -47,6 +48,7 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 			Location:  AtEntry,
 			AbsOffset: entOffset,
 			RelOffset: 0,
+			FetchArgs: fetchArgs[funcname],
 		})
 
 		retOffsets, err := elf.FuncRetOffsets(funcname)
