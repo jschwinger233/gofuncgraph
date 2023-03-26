@@ -2,14 +2,12 @@ package bpf
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
-	dynamicstruct "github.com/ompluscator/dynamic-struct"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event Gofuncgraph ./gofuncgraph.c -- -I./headers
@@ -21,7 +19,7 @@ const (
 
 type BPF struct {
 	executables map[string]*link.Executable
-	objs        interface{}
+	objs        *GofuncgraphObjects
 	closers     []io.Closer
 }
 
@@ -32,65 +30,22 @@ func New() *BPF {
 }
 
 func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
-	structDefine := dynamicstruct.NewStruct().
-		AddField("Ent", &ebpf.Program{}, `ebpf:"ent"`).
-		AddField("Ret", &ebpf.Program{}, `ebpf:"ret"`).
-		AddField("EventStack", &ebpf.Map{}, `ebpf:"event_stack"`).
-		AddField("EventQueue", &ebpf.Map{}, `ebpf:"event_queue"`)
-
 	spec, err := LoadGofuncgraph()
 	if err != nil {
 		return err
 	}
 
-	for _, up := range uprobes {
-		if (up.Location == uprobe.AtRet) || len(up.FetchArgs) == 0 {
-			continue
-		}
-		/*
-			fieldPrefix, progPrefix := "Ent", "ent"
-			suffix := fmt.Sprintf("_%x", up.AbsOffset)
-			progName := progPrefix + suffix
-			structDefine.AddField(fieldPrefix+suffix, &ebpf.Program{}, fmt.Sprintf(`ebpf:"%s"`, progName))
-			spec.Programs[progName] = spec.Programs[progPrefix].Copy()
-			instructions := []asm.Instruction{}
-			eventOffset := EventDataOffset
-			for _, args := range up.FetchArgs {
-				instructions = append(instructions, args.CompileBpfInstructions(VacantR10Offset, eventOffset)...)
-				eventOffset += int64(args.Size)
-			}
-
-			bpfInsertIndex := 0
-			for bpfInsertIndex = range spec.Programs[progName].Instructions {
-				inst := spec.Programs[progName].Instructions[bpfInsertIndex]
-				if inst.OpCode == 123 && inst.Dst == asm.R6 && inst.Src == asm.R7 && inst.Offset == 0 { // *(u64 *)(r6 + 0) = r7
-					break
-				}
-			}
-			bpfInsertIndex += 2 // skip the "e->location = location" / "*(u8 *)(r6 + 34) = r1"
-
-			spec.Programs[progName].Instructions = append(spec.Programs[progName].Instructions[:bpfInsertIndex], append(instructions, spec.Programs[progName].Instructions[bpfInsertIndex:]...)...)
-
-			for i, ins := range spec.Programs[progName].Instructions {
-				if ins.OpCode == 21 { // goto
-					if i < bpfInsertIndex && spec.Programs[progName].Instructions[i].Offset >= int16(bpfInsertIndex) {
-						spec.Programs[progName].Instructions[i].Offset += int16(len(instructions))
-					}
-				}
-			}
-		*/
-	}
-	b.objs = structDefine.Build().New()
-
+	b.objs = &GofuncgraphObjects{}
 	defer func() {
 		if err != nil {
 			return
 		}
-		reader := dynamicstruct.NewReader(b.objs)
-		b.closers = append(b.closers, reader.GetField("EventQueue").Interface().(*ebpf.Map))
-		b.closers = append(b.closers, reader.GetField("EventStack").Interface().(*ebpf.Map))
+		b.closers = append(b.closers, b.objs.EventQueue)
+		b.closers = append(b.closers, b.objs.EventStack)
 	}()
-	return spec.LoadAndAssign(b.objs, nil)
+	return spec.LoadAndAssign(b.objs, &ebpf.CollectionOptions{
+		Programs: ebpf.ProgramOptions{LogSize: ebpf.DefaultVerifierLogSize * 4},
+	})
 }
 
 func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
@@ -98,18 +53,13 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 	if err != nil {
 		return
 	}
-	reader := dynamicstruct.NewReader(b.objs)
 	for _, up := range uprobes {
 		var prog *ebpf.Program
 		switch up.Location {
 		case uprobe.AtEntry:
-			suffix := ""
-			if len(up.FetchArgs) > 0 {
-				suffix = fmt.Sprintf("_%x", up.AbsOffset)
-			}
-			prog = reader.GetField("Ent" + suffix).Interface().(*ebpf.Program)
+			prog = b.objs.Ent
 		case uprobe.AtRet:
-			prog = reader.GetField("Ret").Interface().(*ebpf.Program)
+			prog = b.objs.Ret
 		}
 		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.AbsOffset})
 		if err != nil {
@@ -130,7 +80,6 @@ func (b *BPF) Detach() {
 func (b *BPF) PollEvents(ctx context.Context) chan GofuncgraphEvent {
 	ch := make(chan GofuncgraphEvent)
 
-	queue := dynamicstruct.NewReader(b.objs).GetField("EventQueue").Interface().(*ebpf.Map)
 	go func() {
 		defer close(ch)
 		for {
@@ -139,7 +88,7 @@ func (b *BPF) PollEvents(ctx context.Context) chan GofuncgraphEvent {
 			case <-ctx.Done():
 				return
 			default:
-				if err := queue.LookupAndDelete(nil, &event); err != nil {
+				if err := b.objs.EventQueue.LookupAndDelete(nil, &event); err != nil {
 					time.Sleep(time.Millisecond)
 					continue
 				}

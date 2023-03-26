@@ -21,8 +21,7 @@ type GofuncgraphEvent struct {
 	CallerBp uint64
 	TimeNs   uint64
 	Location uint8
-	Data     [100]uint8
-	_        [3]byte
+	_        [7]byte
 }
 
 // LoadGofuncgraph returns the embedded CollectionSpec for Gofuncgraph.
@@ -74,8 +73,11 @@ type GofuncgraphProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GofuncgraphMapSpecs struct {
-	EventQueue *ebpf.MapSpec `ebpf:"event_queue"`
-	EventStack *ebpf.MapSpec `ebpf:"event_stack"`
+	ArgQueue    *ebpf.MapSpec `ebpf:"arg_queue"`
+	ArgRulesMap *ebpf.MapSpec `ebpf:"arg_rules_map"`
+	ArgStack    *ebpf.MapSpec `ebpf:"arg_stack"`
+	EventQueue  *ebpf.MapSpec `ebpf:"event_queue"`
+	EventStack  *ebpf.MapSpec `ebpf:"event_stack"`
 }
 
 // GofuncgraphObjects contains all objects after they have been loaded into the kernel.
@@ -97,12 +99,18 @@ func (o *GofuncgraphObjects) Close() error {
 //
 // It can be passed to LoadGofuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GofuncgraphMaps struct {
-	EventQueue *ebpf.Map `ebpf:"event_queue"`
-	EventStack *ebpf.Map `ebpf:"event_stack"`
+	ArgQueue    *ebpf.Map `ebpf:"arg_queue"`
+	ArgRulesMap *ebpf.Map `ebpf:"arg_rules_map"`
+	ArgStack    *ebpf.Map `ebpf:"arg_stack"`
+	EventQueue  *ebpf.Map `ebpf:"event_queue"`
+	EventStack  *ebpf.Map `ebpf:"event_stack"`
 }
 
 func (m *GofuncgraphMaps) Close() error {
 	return _GofuncgraphClose(
+		m.ArgQueue,
+		m.ArgRulesMap,
+		m.ArgStack,
 		m.EventQueue,
 		m.EventStack,
 	)

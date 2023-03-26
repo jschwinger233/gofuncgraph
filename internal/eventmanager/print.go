@@ -3,7 +3,6 @@ package eventmanager
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jschwinger233/gofuncgraph/internal/bpf"
@@ -49,21 +48,7 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
 			}
-			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %s %s %s+%d { %s %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
-			} else {
-				argStrings := []string{}
-				data := event.Data[:]
-				for _, arg := range uprobe.FetchArgs {
-					argString, err := m.SprintArg(arg, data)
-					if err != nil {
-						return err
-					}
-					argStrings = append(argStrings, argString)
-					data = data[arg.Size:]
-				}
-				fmt.Printf("%s %8.4f %s %s+%d(%s) { %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(argStrings, ", "), callChain)
-			}
+			fmt.Printf("%s %s %s %s+%d { %s %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
 			indent += "  "
 
 		case 1: // retpoint
