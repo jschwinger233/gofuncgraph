@@ -7,10 +7,9 @@ import (
 )
 
 type ParseOptions struct {
-	Wildcards     []string
-	ExWildcards   []string
-	Fetch         map[string]map[string]string // funcname: varname: expression
-	CustomOffsets map[string][]uint64          // funcname: [rel_offset]
+	Wildcards   []string
+	ExWildcards []string
+	Fetch       map[string]map[string]string // funcname: varname: expression
 }
 
 func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {

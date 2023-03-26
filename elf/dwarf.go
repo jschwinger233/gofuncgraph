@@ -2,6 +2,8 @@ package elf
 
 import (
 	"debug/dwarf"
+	"io"
+	"sort"
 
 	"github.com/pkg/errors"
 )
@@ -84,4 +86,41 @@ func (e *ELF) FuncPcRangeInDwarf(funcname string) (lowpc, highpc uint64, err err
 		highpc = lowpc + uint64(v)
 	}
 	return
+}
+
+func (e *ELF) LineEntries() (lineEntries []dwarf.LineEntry, err error) {
+	if v, ok := e.cache["lineEntries"]; ok {
+		return v.([]dwarf.LineEntry), nil
+	}
+	for die := range e.IterDebugInfo() {
+		if die.Tag == dwarf.TagCompileUnit {
+			var lineReader *dwarf.LineReader
+			lineReader, err = e.dwarfData.LineReader(die)
+			if err != nil || lineReader == nil {
+				continue
+			}
+
+			for {
+				entry := dwarf.LineEntry{}
+				if err = lineReader.Next(&entry); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return
+				}
+				lineEntries = append(lineEntries, entry)
+			}
+		}
+	}
+	sort.Slice(lineEntries, func(i, j int) bool { return lineEntries[i].Address < lineEntries[j].Address })
+	return
+}
+
+func (e *ELF) LineInfoForPc(pc uint64) (filename string, line int, err error) {
+	lineEntries, err := e.LineEntries()
+	if err != nil {
+		return
+	}
+	idx := sort.Search(len(lineEntries), func(i int) bool { return lineEntries[i].Address >= pc }) - 1
+	return lineEntries[idx].File.Name, lineEntries[idx].Line, nil
 }

@@ -11,7 +11,7 @@ func (e *ELF) Text() (bytes []byte, err error) {
 	return e.cache["textBytes"].([]byte), nil
 }
 
-func (e *ELF) FuncRawInstructions(name string) (bytes []byte, addr, offset uint64, err error) {
+func (e *ELF) FuncRawInstructions(name string) (textBytes []byte, addr, offset uint64, err error) {
 	lowpc, highpc, err := e.FuncPcRangeInDwarf(name)
 	if err != nil {
 		if lowpc, highpc, err = e.FuncPcRangeInSymtab(name); err != nil {
@@ -20,13 +20,13 @@ func (e *ELF) FuncRawInstructions(name string) (bytes []byte, addr, offset uint6
 	}
 
 	section := e.Section(".text")
-	if bytes, err = e.Text(); err != nil {
+	if textBytes, err = e.Text(); err != nil {
 		return
 	}
 
-	if uint64(len(bytes)) < highpc-section.Addr || lowpc < section.Addr {
-		err = errors.WithMessage(PcRangeTooLargeErr, name)
+	if highpc > uint64(len(textBytes))+section.Addr || lowpc < section.Addr {
+		err = errors.Wrap(PcRangeTooLargeErr, name)
 		return
 	}
-	return bytes[lowpc-section.Addr : highpc-section.Addr], lowpc, lowpc - section.Addr + section.Offset, nil
+	return textBytes[lowpc-section.Addr : highpc-section.Addr], lowpc, lowpc - section.Addr + section.Offset, nil
 }

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/jschwinger233/gofuncgraph/elf"
@@ -47,9 +46,8 @@ func NewTracer(bin string, args []string) (_ *Tracer, err error) {
 	}, nil
 }
 
-func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, offsets map[string][]uint64, err error) {
+func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, err error) {
 	fetch = map[string]map[string]string{}
-	offsets = map[string][]uint64{}
 	for _, input := range inputs {
 		if input[len(input)-1] == ')' {
 			stack := []byte{')'}
@@ -86,17 +84,6 @@ func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]m
 			}
 		}
 
-		if OffsetPattern.MatchString(input) {
-			idx := OffsetPattern.FindAllStringIndex(input, -1)[0][0]
-			offset, e := strconv.ParseUint(input[idx+1:len(input)], 10, 64)
-			if e != nil {
-				err = fmt.Errorf("invalid custom offset: %s", input[idx+1:len(input)])
-				return
-			}
-			offsets[input[:idx]] = append(offsets[input[:idx]], offset)
-			input = input[:idx]
-		}
-
 		if input[0] == '!' {
 			ex = append(ex, input[1:])
 		} else {
@@ -107,15 +94,14 @@ func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]m
 }
 
 func (t *Tracer) Start() (err error) {
-	in, ex, fetch, offsets, err := t.ParseArgs(t.args)
+	in, ex, fetch, err := t.ParseArgs(t.args)
 	if err != nil {
 		return
 	}
 	uprobes, err := uprobe.Parse(t.elf, &uprobe.ParseOptions{
-		Wildcards:     in,
-		ExWildcards:   ex,
-		Fetch:         fetch,
-		CustomOffsets: offsets,
+		Wildcards:   in,
+		ExWildcards: ex,
+		Fetch:       fetch,
 	})
 	if err != nil {
 		return

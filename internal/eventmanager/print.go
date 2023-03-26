@@ -10,10 +10,6 @@ import (
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 )
 
-const (
-	placeholder = "        "
-)
-
 func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string, err error) {
 	if event.CallerIp == 0 {
 		return "", nil
@@ -25,12 +21,13 @@ func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string
 	return fmt.Sprintf("%s+%d", syms[0].Name, off), nil
 }
 
-func (m *EventManager) PrintStack(StackId uint64) (err error) {
+func (m *EventManager) PrintStack(goid uint64) (err error) {
 	indent := ""
 	fmt.Println()
 	startTimeStack := []uint64{}
 	var lastEvent bpf.GofuncgraphEvent
-	for _, event := range m.goroutine2events[StackId] {
+	for _, event := range m.goroutine2events[goid] {
+		lineInfo := "?:?"
 		t := m.bootTime.Add(time.Duration(event.TimeNs)).Format("02 15:04:05.0000")
 		syms, offset, err := m.elf.ResolveAddress(event.Ip)
 		if err != nil {
@@ -48,12 +45,15 @@ func (m *EventManager) PrintStack(StackId uint64) (err error) {
 			if err != nil {
 				return err
 			}
+			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
+				lineInfo = fmt.Sprintf("%s:%d", filename, line)
+			}
 			sinceLastEvent := 0.
 			if lastEvent.TimeNs != 0 {
 				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
 			}
 			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %8.4f %s %s+%d { %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, callChain)
+				fmt.Printf("%s %8.4f %s %s+%d { %s %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
 			} else {
 				argStrings := []string{}
 				data := event.Data[:]
@@ -73,10 +73,13 @@ func (m *EventManager) PrintStack(StackId uint64) (err error) {
 			if len(indent) == 0 {
 				continue
 			}
+			if filename, line, err := m.elf.LineInfoForPc(event.Ip); err == nil {
+				lineInfo = fmt.Sprintf("%s:%d", filename, line)
+			}
 			elapsed := event.TimeNs - startTimeStack[len(startTimeStack)-1]
 			startTimeStack = startTimeStack[:len(startTimeStack)-1]
 			indent = indent[:len(indent)-2]
-			fmt.Printf("%s %8.4f %s } %s+%d\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset)
+			fmt.Printf("%s %8.4f %s } %s+%d %s\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset, lineInfo)
 
 		case 2: // custompoint
 			if len(indent) == 0 {
@@ -132,8 +135,8 @@ func (m *EventManager) SprintArg(arg *uprobe.FetchArg, data []uint8) (_ string, 
 }
 
 func (m *EventManager) PrintRemaining() (err error) {
-	for StackId := range m.goroutine2events {
-		if err = m.PrintStack(StackId); err != nil {
+	for goid := range m.goroutine2events {
+		if err = m.PrintStack(goid); err != nil {
 			break
 		}
 	}

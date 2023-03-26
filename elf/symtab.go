@@ -40,7 +40,7 @@ func (f *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err e
 
 	idx := sort.Search(len(symbols), func(i int) bool { return symbols[i].Value > addr })
 	if idx == 0 {
-		err = errors.WithMessage(SymbolNotFoundError, fmt.Sprintf("%x", addr))
+		err = errors.Wrap(SymbolNotFoundError, fmt.Sprintf("%x", addr))
 		return
 	}
 
@@ -62,7 +62,7 @@ func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
 
 	symbol, ok := symnames[sym]
 	if !ok {
-		err = errors.WithMessage(SymbolNotFoundError, sym)
+		err = errors.Wrap(SymbolNotFoundError, sym)
 	}
 	return
 }
@@ -84,7 +84,7 @@ func (e *ELF) FuncPcRangeInSymtab(name string) (lowpc, highpc uint64, err error)
 
 	sym, ok := symnames[name]
 	if !ok || elf.ST_TYPE(sym.Info) != elf.STT_FUNC {
-		err = errors.WithMessage(SymbolNotFoundError, name)
+		err = errors.Wrap(SymbolNotFoundError, name)
 		return
 	}
 
