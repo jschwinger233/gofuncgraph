@@ -2,6 +2,7 @@ package uprobe
 
 import (
 	debugelf "debug/elf"
+	"fmt"
 
 	"github.com/jschwinger233/gofuncgraph/elf"
 )
@@ -35,10 +36,12 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 	}
 
 	for _, funcname := range funcnames {
+		fmt.Printf("add uprobes for %s: ", funcname)
 		entOffset, err := elf.FuncOffset(funcname)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("0x%x -> ", entOffset)
 		uprobes = append(uprobes, Uprobe{
 			Funcname:  funcname,
 			Location:  AtEntry,
@@ -50,7 +53,9 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("[ ")
 		for _, retOffset := range retOffsets {
+			fmt.Printf("0x%x ", retOffset)
 			uprobes = append(uprobes, Uprobe{
 				Funcname:  funcname,
 				Location:  AtRet,
@@ -58,6 +63,7 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 				RelOffset: retOffset - entOffset,
 			})
 		}
+		fmt.Printf("]\n")
 	}
 	return
 }
