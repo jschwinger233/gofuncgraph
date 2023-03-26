@@ -113,6 +113,7 @@ func (e *ELF) LineEntries() (lineEntries []dwarf.LineEntry, err error) {
 		}
 	}
 	sort.Slice(lineEntries, func(i, j int) bool { return lineEntries[i].Address < lineEntries[j].Address })
+	e.cache["lineEntries"] = lineEntries
 	return
 }
 

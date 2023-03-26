@@ -10,6 +10,8 @@ import (
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 )
 
+const placeholder = "        "
+
 func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string, err error) {
 	if event.CallerIp == 0 {
 		return "", nil
@@ -25,7 +27,6 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 	indent := ""
 	fmt.Println()
 	startTimeStack := []uint64{}
-	var lastEvent bpf.GofuncgraphEvent
 	for _, event := range m.goroutine2events[goid] {
 		lineInfo := "?:?"
 		t := m.bootTime.Add(time.Duration(event.TimeNs)).Format("02 15:04:05.0000")
@@ -48,12 +49,8 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
 			}
-			sinceLastEvent := 0.
-			if lastEvent.TimeNs != 0 {
-				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
-			}
 			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %8.4f %s %s+%d { %s %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
+				fmt.Printf("%s %s %s %s+%d { %s %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
 			} else {
 				argStrings := []string{}
 				data := event.Data[:]
@@ -65,7 +62,7 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 					argStrings = append(argStrings, argString)
 					data = data[arg.Size:]
 				}
-				fmt.Printf("%s %8.4f %s %s+%d(%s) { %s\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(argStrings, ", "), callChain)
+				fmt.Printf("%s %8.4f %s %s+%d(%s) { %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(argStrings, ", "), callChain)
 			}
 			indent += "  "
 
@@ -79,38 +76,9 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			elapsed := event.TimeNs - startTimeStack[len(startTimeStack)-1]
 			startTimeStack = startTimeStack[:len(startTimeStack)-1]
 			indent = indent[:len(indent)-2]
-			fmt.Printf("%s %8.4f %s } %s+%d %s\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset, lineInfo)
-
-		case 2: // custompoint
-			if len(indent) == 0 {
-				continue
-			}
-			uprobe, err := m.GetUprobe(event)
-			if err != nil {
-				return err
-			}
-			sinceLastEvent := 0.
-			if lastEvent.TimeNs != 0 {
-				sinceLastEvent = time.Duration(event.TimeNs - lastEvent.TimeNs).Seconds()
-			}
-			if len(uprobe.FetchArgs) == 0 {
-				fmt.Printf("%s %8.4f %s %s+%d\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset)
-			} else {
-				argStrings := []string{}
-				data := event.Data[:]
-				for _, arg := range uprobe.FetchArgs {
-					argString, err := m.SprintArg(arg, data)
-					if err != nil {
-						return err
-					}
-					argStrings = append(argStrings, argString)
-					data = data[arg.Size:]
-				}
-				fmt.Printf("%s %8.4f %s %s+%d(%s)\n", t, sinceLastEvent, indent, uprobe.Funcname, uprobe.RelOffset, strings.Join(argStrings, ", "))
-			}
+			fmt.Printf("%s %08.4f %s } %s+%d %s\n", t, time.Duration(elapsed).Seconds(), indent, syms[0].Name, offset, lineInfo)
 		}
 
-		lastEvent = event
 	}
 	return
 }
