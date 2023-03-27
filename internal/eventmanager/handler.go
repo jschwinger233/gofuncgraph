@@ -17,32 +17,32 @@ func (m *EventManager) Handle(event bpf.GofuncgraphEvent) (err error) {
 	return
 }
 
-func (p *EventManager) Add(event bpf.GofuncgraphEvent) {
-	length := len(p.goroutine2events[event.Goid])
+func (m *EventManager) Add(event bpf.GofuncgraphEvent) {
+	length := len(m.goEvents[event.Goid])
 	if length == 0 && event.Location != 0 {
 		return
 	}
 	if length > 0 {
-		lastEvent := p.goroutine2events[event.Goid][length-1]
+		lastEvent := m.goEvents[event.Goid][length-1]
 		if lastEvent.Ip == event.Ip && lastEvent.Bp != event.CallerBp {
 			// duplicated entry event due to stack expansion
 			return
 		}
 	}
-	p.goroutine2events[event.Goid] = append(p.goroutine2events[event.Goid], event)
+	m.goEvents[event.Goid] = append(m.goEvents[event.Goid], event)
 	switch event.Location {
 	case 0:
-		p.goroutine2stack[event.Goid]++
+		m.goEventStack[event.Goid]++
 	case 1:
-		p.goroutine2stack[event.Goid]--
+		m.goEventStack[event.Goid]--
 	}
 }
 
-func (p *EventManager) CloseStack(event bpf.GofuncgraphEvent) bool {
-	return p.goroutine2stack[event.Goid] == 0 && len(p.goroutine2events[event.Goid]) > 0
+func (m *EventManager) CloseStack(event bpf.GofuncgraphEvent) bool {
+	return m.goEventStack[event.Goid] == 0 && len(m.goEvents[event.Goid]) > 0
 }
 
-func (p *EventManager) ClearStack(event bpf.GofuncgraphEvent) {
-	delete(p.goroutine2events, event.Goid)
-	delete(p.goroutine2stack, event.Goid)
+func (m *EventManager) ClearStack(event bpf.GofuncgraphEvent) {
+	delete(m.goEvents, event.Goid)
+	delete(m.goEventStack, event.Goid)
 }

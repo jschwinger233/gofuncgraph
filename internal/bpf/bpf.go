@@ -11,7 +11,7 @@ import (
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event -type arg_rules -type arg_rule Gofuncgraph ./gofuncgraph.c -- -I./headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event -type arg_rules -type arg_rule -type arg_data Gofuncgraph ./gofuncgraph.c -- -I./headers
 
 const (
 	EventDataOffset int64 = 436
@@ -38,14 +38,19 @@ var RegisterConstants = map[string]uint8{
 }
 
 type BPF struct {
-	executables map[string]*link.Executable
-	objs        *GofuncgraphObjects
-	closers     []io.Closer
+	objs    *GofuncgraphObjects
+	closers []io.Closer
 }
 
 func New() *BPF {
-	return &BPF{
-		executables: map[string]*link.Executable{},
+	return &BPF{}
+}
+
+func (b *BPF) BpfConfig(fetchArgs bool) interface{} {
+	return struct {
+		FetchArgs bool
+	}{
+		FetchArgs: fetchArgs,
 	}
 }
 
@@ -63,6 +68,17 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 		b.closers = append(b.closers, b.objs.EventQueue)
 		b.closers = append(b.closers, b.objs.EventStack)
 	}()
+
+	fetchArgs := false
+	for _, uprobe := range uprobes {
+		if len(uprobe.FetchArgs) > 0 {
+			fetchArgs = true
+			break
+		}
+	}
+	if err = spec.RewriteConstants(map[string]interface{}{"CONFIG": b.BpfConfig(fetchArgs)}); err != nil {
+		return
+	}
 	if err = spec.LoadAndAssign(b.objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{LogSize: ebpf.DefaultVerifierLogSize * 4},
 	}); err != nil {
@@ -71,7 +87,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 
 	for _, uprobe := range uprobes {
 		if len(uprobe.FetchArgs) > 0 {
-			if err = b.setArgRules(uprobe.AbsOffset, uprobe.FetchArgs); err != nil {
+			if err = b.setArgRules(uprobe.Address, uprobe.FetchArgs); err != nil {
 				return
 			}
 		}
@@ -153,6 +169,28 @@ func (b *BPF) PollEvents(ctx context.Context) chan GofuncgraphEvent {
 				}
 				ch <- event
 			}
+		}
+	}()
+	return ch
+}
+
+func (b *BPF) PollArg(ctx context.Context) <-chan GofuncgraphArgData {
+	ch := make(chan GofuncgraphArgData)
+	go func() {
+		defer close(ch)
+		for {
+			data := GofuncgraphArgData{}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if err := b.objs.ArgQueue.LookupAndDelete(nil, &data); err != nil {
+					time.Sleep(time.Millisecond)
+					continue
+				}
+				ch <- data
+			}
+
 		}
 	}()
 	return ch

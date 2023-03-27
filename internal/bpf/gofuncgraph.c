@@ -51,10 +51,11 @@ const struct arg_rules *__ __attribute__((unused));
 
 struct arg_data {
 	__u64 goid;
-	__u64 ip;
 	__u64 regval;
 	__u8 data[MAX_DATA_SIZE];
 };
+
+const struct arg_data *___ __attribute__((unused));
 
 struct bpf_map_def SEC("maps") arg_rules_map = {
 	.type = BPF_MAP_TYPE_HASH,
@@ -107,37 +108,53 @@ void fetch_args_from_reg(struct pt_regs *ctx, struct arg_data *data, struct arg_
 {
 	switch (rule->type) {
 	case 0:
-		data->regval = ctx->ax;
+		__builtin_memcpy(&data->data, &ctx->ax, sizeof(ctx->ax));
+		break;
 	case 1:
-		data->regval = ctx->dx;
+		__builtin_memcpy(&data->data, &ctx->dx, sizeof(ctx->dx));
+		break;
 	case 2:
-		data->regval = ctx->cx;
+		__builtin_memcpy(&data->data, &ctx->cx, sizeof(ctx->cx));
+		break;
 	case 3:
-		data->regval = ctx->bx;
+		__builtin_memcpy(&data->data, &ctx->bx, sizeof(ctx->bx));
+		break;
 	case 4:
-		data->regval = ctx->si;
+		__builtin_memcpy(&data->data, &ctx->si, sizeof(ctx->si));
+		break;
 	case 5:
-		data->regval = ctx->di;
+		__builtin_memcpy(&data->data, &ctx->di, sizeof(ctx->di));
+		break;
 	case 6:
-		data->regval = ctx->bp;
+		__builtin_memcpy(&data->data, &ctx->bp, sizeof(ctx->bp));
+		break;
 	case 7:
-		data->regval = ctx->sp;
+		__builtin_memcpy(&data->data, &ctx->sp, sizeof(ctx->sp));
+		break;
 	case 8:
-		data->regval = ctx->r8;
+		__builtin_memcpy(&data->data, &ctx->r8, sizeof(ctx->r8));
+		break;
 	case 9:
-		data->regval = ctx->r9;
+		__builtin_memcpy(&data->data, &ctx->r9, sizeof(ctx->r9));
+		break;
 	case 10:
-		data->regval = ctx->r10;
+		__builtin_memcpy(&data->data, &ctx->r10, sizeof(ctx->r10));
+		break;
 	case 11:
-		data->regval = ctx->r11;
+		__builtin_memcpy(&data->data, &ctx->r11, sizeof(ctx->r11));
+		break;
 	case 12:
-		data->regval = ctx->r12;
+		__builtin_memcpy(&data->data, &ctx->r12, sizeof(ctx->r12));
+		break;
 	case 13:
-		data->regval = ctx->r13;
+		__builtin_memcpy(&data->data, &ctx->r13, sizeof(ctx->r13));
+		break;
 	case 14:
-		data->regval = ctx->r14;
+		__builtin_memcpy(&data->data, &ctx->r14, sizeof(ctx->r14));
+		break;
 	case 15:
-		data->regval = ctx->r15;
+		__builtin_memcpy(&data->data, &ctx->r15, sizeof(ctx->r15));
+		break;
 	}
 	bpf_map_push_elem(&arg_queue, data, BPF_EXIST);
 	return;
@@ -173,7 +190,6 @@ void fetch_args(struct pt_regs *ctx, __u64 goid, __u64 ip)
 
 	__builtin_memset(data, 0, sizeof(*data));
 	data->goid = goid;
-	data->ip = ip;
 
 	for (int i = 0; i < 8; i++) {
 		if (rules->length == i)

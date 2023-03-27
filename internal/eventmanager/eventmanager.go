@@ -13,14 +13,17 @@ import (
 
 type EventManager struct {
 	elf     *elf.ELF
+	argCh   <-chan bpf.GofuncgraphArgData
 	uprobes map[string]uprobe.Uprobe
 
-	goroutine2events map[uint64][]bpf.GofuncgraphEvent
-	goroutine2stack  map[uint64]uint64
-	bootTime         time.Time
+	goEvents     map[uint64][]bpf.GofuncgraphEvent
+	goEventStack map[uint64]uint64
+	goArgs       map[uint64]chan bpf.GofuncgraphArgData
+
+	bootTime time.Time
 }
 
-func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
+func New(uprobes []uprobe.Uprobe, elf *elf.ELF, ch <-chan bpf.GofuncgraphArgData) (_ *EventManager, err error) {
 	host, err := sysinfo.Host()
 	if err != nil {
 		return
@@ -30,22 +33,35 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF) (_ *EventManager, err error) {
 	for _, up := range uprobes {
 		uprobesMap[fmt.Sprintf("%s+%d", up.Funcname, up.RelOffset)] = up
 	}
-	return &EventManager{
-		elf:              elf,
-		goroutine2events: map[uint64][]bpf.GofuncgraphEvent{},
-		goroutine2stack:  map[uint64]uint64{},
-		bootTime:         bootTime,
-		uprobes:          uprobesMap,
-	}, nil
+	m := &EventManager{
+		elf:          elf,
+		argCh:        ch,
+		uprobes:      uprobesMap,
+		goEvents:     map[uint64][]bpf.GofuncgraphEvent{},
+		goEventStack: map[uint64]uint64{},
+		goArgs:       map[uint64]chan bpf.GofuncgraphArgData{},
+		bootTime:     bootTime,
+	}
+	go m.handleArg()
+	return m, err
 }
 
-func (p *EventManager) GetUprobe(event bpf.GofuncgraphEvent) (_ uprobe.Uprobe, err error) {
-	syms, offset, err := p.elf.ResolveAddress(event.Ip)
+func (m *EventManager) handleArg() {
+	for arg := range m.argCh {
+		if _, ok := m.goArgs[arg.Goid]; !ok {
+			m.goArgs[arg.Goid] = make(chan bpf.GofuncgraphArgData, 1000)
+		}
+		m.goArgs[arg.Goid] <- arg
+	}
+}
+
+func (m *EventManager) GetUprobe(event bpf.GofuncgraphEvent) (_ uprobe.Uprobe, err error) {
+	syms, offset, err := m.elf.ResolveAddress(event.Ip)
 	if err != nil {
 		return
 	}
 	for _, sym := range syms {
-		uprobe, ok := p.uprobes[fmt.Sprintf("%s+%d", sym.Name, offset)]
+		uprobe, ok := m.uprobes[fmt.Sprintf("%s+%d", sym.Name, offset)]
 		if ok {
 			return uprobe, nil
 		}

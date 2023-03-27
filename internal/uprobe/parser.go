@@ -38,6 +38,10 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 
 	for _, funcname := range funcnames {
 		fmt.Printf("add uprobes for %s: ", funcname)
+		sym, err := elf.ResolveSymbol(funcname)
+		if err != nil {
+			return nil, err
+		}
 		entOffset, err := elf.FuncOffset(funcname)
 		if err != nil {
 			return nil, err
@@ -46,6 +50,7 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 		uprobes = append(uprobes, Uprobe{
 			Funcname:  funcname,
 			Location:  AtEntry,
+			Address:   sym.Value,
 			AbsOffset: entOffset,
 			RelOffset: 0,
 			FetchArgs: fetchArgs[funcname],

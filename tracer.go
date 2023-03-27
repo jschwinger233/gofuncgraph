@@ -118,13 +118,13 @@ func (t *Tracer) Start() (err error) {
 	defer t.bpf.Detach()
 	log.Info("start tracing\n")
 
-	eventManager, err := eventmanager.New(uprobes, t.elf)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	eventManager, err := eventmanager.New(uprobes, t.elf, t.bpf.PollArg(ctx))
 	if err != nil {
 		return
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
 
 	for event := range t.bpf.PollEvents(ctx) {
 		if err = eventManager.Handle(event); err != nil {

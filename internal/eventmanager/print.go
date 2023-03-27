@@ -3,6 +3,7 @@ package eventmanager
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jschwinger233/gofuncgraph/internal/bpf"
@@ -26,7 +27,7 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 	indent := ""
 	fmt.Println()
 	startTimeStack := []uint64{}
-	for _, event := range m.goroutine2events[goid] {
+	for _, event := range m.goEvents[goid] {
 		lineInfo := "?:?"
 		t := m.bootTime.Add(time.Duration(event.TimeNs)).Format("02 15:04:05.0000")
 		syms, offset, err := m.elf.ResolveAddress(event.Ip)
@@ -48,7 +49,16 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
 			}
-			fmt.Printf("%s %s %s %s+%d { %s %s\n", t, placeholder, indent, uprobe.Funcname, uprobe.RelOffset, callChain, lineInfo)
+
+			args := []string{}
+			for _, fetchArg := range uprobe.FetchArgs {
+				arg := <-m.goArgs[goid]
+				if len(args) > 0 {
+					args = append(args, ", ")
+				}
+				args = append(args, fetchArg.Varname, "=", fetchArg.SprintValue(arg.Data[:]))
+			}
+			fmt.Printf("%s %s %s %s(%s) { %s %s\n", t, placeholder, indent, uprobe.Funcname, strings.Join(args, ""), callChain, lineInfo)
 			indent += "  "
 
 		case 1: // retpoint
@@ -88,7 +98,7 @@ func (m *EventManager) SprintArg(arg *uprobe.FetchArg, data []uint8) (_ string, 
 }
 
 func (m *EventManager) PrintRemaining() (err error) {
-	for goid := range m.goroutine2events {
+	for goid := range m.goEvents {
 		if err = m.PrintStack(goid); err != nil {
 			break
 		}
