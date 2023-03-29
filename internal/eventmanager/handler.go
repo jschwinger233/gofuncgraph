@@ -1,6 +1,9 @@
 package eventmanager
 
 import (
+	"strings"
+	"time"
+
 	"github.com/jschwinger233/gofuncgraph/internal/bpf"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,14 +25,40 @@ func (m *EventManager) Add(event bpf.GofuncgraphEvent) {
 	if length == 0 && event.Location != 0 {
 		return
 	}
+	uprobe, err := m.GetUprobe(event)
+	if err != nil {
+		log.Errorf("failed to get uprobe for event %+v: %+v", event, err)
+		return
+	}
 	if length > 0 {
 		lastEvent := m.goEvents[event.Goid][length-1]
 		if lastEvent.Ip == event.Ip && lastEvent.Bp != event.CallerBp {
-			// duplicated entry event due to stack expansion
+			// duplicated entry event due to stack expansion/shrinkage
+			log.Debugf("duplicated entry event: %+v", event)
+			m.goEvents[event.Goid][length-1].GofuncgraphEvent = event
+			for range uprobe.FetchArgs {
+				<-m.goArgs[event.Goid]
+			}
 			return
 		}
 	}
-	m.goEvents[event.Goid] = append(m.goEvents[event.Goid], event)
+
+	args := []string{}
+	for _, fetchArg := range uprobe.FetchArgs {
+		for m.goArgs[event.Goid] == nil {
+			time.Sleep(time.Millisecond)
+		}
+		arg := <-m.goArgs[event.Goid]
+		if len(args) > 0 {
+			args = append(args, ", ")
+		}
+		args = append(args, fetchArg.Varname, "=", fetchArg.SprintValue(arg.Data[:]))
+	}
+	m.goEvents[event.Goid] = append(m.goEvents[event.Goid], Event{
+		GofuncgraphEvent: event,
+		uprobe:           &uprobe,
+		argString:        strings.Join(args, ""),
+	})
 	switch event.Location {
 	case 0:
 		m.goEventStack[event.Goid]++

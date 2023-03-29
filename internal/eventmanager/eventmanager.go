@@ -9,14 +9,21 @@ import (
 	"github.com/jschwinger233/gofuncgraph/elf"
 	"github.com/jschwinger233/gofuncgraph/internal/bpf"
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
+	log "github.com/sirupsen/logrus"
 )
+
+type Event struct {
+	bpf.GofuncgraphEvent
+	uprobe    *uprobe.Uprobe
+	argString string
+}
 
 type EventManager struct {
 	elf     *elf.ELF
 	argCh   <-chan bpf.GofuncgraphArgData
 	uprobes map[string]uprobe.Uprobe
 
-	goEvents     map[uint64][]bpf.GofuncgraphEvent
+	goEvents     map[uint64][]Event
 	goEventStack map[uint64]uint64
 	goArgs       map[uint64]chan bpf.GofuncgraphArgData
 
@@ -37,7 +44,7 @@ func New(uprobes []uprobe.Uprobe, elf *elf.ELF, ch <-chan bpf.GofuncgraphArgData
 		elf:          elf,
 		argCh:        ch,
 		uprobes:      uprobesMap,
-		goEvents:     map[uint64][]bpf.GofuncgraphEvent{},
+		goEvents:     map[uint64][]Event{},
 		goEventStack: map[uint64]uint64{},
 		goArgs:       map[uint64]chan bpf.GofuncgraphArgData{},
 		bootTime:     bootTime,
@@ -51,6 +58,7 @@ func (m *EventManager) handleArg() {
 		if _, ok := m.goArgs[arg.Goid]; !ok {
 			m.goArgs[arg.Goid] = make(chan bpf.GofuncgraphArgData, 1000)
 		}
+		log.Debugf("add arg %+v", arg)
 		m.goArgs[arg.Goid] <- arg
 	}
 }

@@ -3,16 +3,14 @@ package eventmanager
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/jschwinger233/gofuncgraph/internal/bpf"
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
 )
 
 const placeholder = "        "
 
-func (m *EventManager) SprintCallChain(event bpf.GofuncgraphEvent) (chain string, err error) {
+func (m *EventManager) SprintCallChain(event Event) (chain string, err error) {
 	if event.CallerIp == 0 {
 		return "", nil
 	}
@@ -42,23 +40,11 @@ func (m *EventManager) PrintStack(goid uint64) (err error) {
 			if err != nil {
 				return err
 			}
-			uprobe, err := m.GetUprobe(event)
-			if err != nil {
-				return err
-			}
 			if filename, line, err := m.elf.LineInfoForPc(event.CallerIp); err == nil {
 				lineInfo = fmt.Sprintf("%s:%d", filename, line)
 			}
 
-			args := []string{}
-			for _, fetchArg := range uprobe.FetchArgs {
-				arg := <-m.goArgs[goid]
-				if len(args) > 0 {
-					args = append(args, ", ")
-				}
-				args = append(args, fetchArg.Varname, "=", fetchArg.SprintValue(arg.Data[:]))
-			}
-			fmt.Printf("%s %s %s %s(%s) { %s %s\n", t, placeholder, indent, uprobe.Funcname, strings.Join(args, ""), callChain, lineInfo)
+			fmt.Printf("%s %s %s %s(%s) { %s %s\n", t, placeholder, indent, event.uprobe.Funcname, event.argString, callChain, lineInfo)
 			indent += "  "
 
 		case 1: // retpoint
