@@ -14,9 +14,8 @@ import (
 )
 
 type GofuncgraphArgData struct {
-	Goid   uint64
-	Regval uint64
-	Data   [64]uint8
+	Goid uint64
+	Data [64]uint8
 }
 
 type GofuncgraphArgRule struct {

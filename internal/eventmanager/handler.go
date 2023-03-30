@@ -37,6 +37,9 @@ func (m *EventManager) Add(event bpf.GofuncgraphEvent) {
 			log.Debugf("duplicated entry event: %+v", event)
 			m.goEvents[event.Goid][length-1].GofuncgraphEvent = event
 			for range uprobe.FetchArgs {
+				for m.goArgs[event.Goid] == nil {
+					time.Sleep(time.Millisecond)
+				}
 				<-m.goArgs[event.Goid]
 			}
 			return

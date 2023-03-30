@@ -51,7 +51,6 @@ const struct arg_rules *__ __attribute__((unused));
 
 struct arg_data {
 	__u64 goid;
-	__u64 regval;
 	__u8 data[MAX_DATA_SIZE];
 };
 
@@ -104,68 +103,77 @@ __u64 get_goid()
 }
 
 static __always_inline
-void fetch_args_from_reg(struct pt_regs *ctx, struct arg_data *data, struct arg_rule *rule)
+void read_reg(struct pt_regs *ctx, __u8 reg, __u64 *regval)
 {
-	switch (rule->type) {
+	switch (reg) {
 	case 0:
-		__builtin_memcpy(&data->data, &ctx->ax, sizeof(ctx->ax));
+		bpf_probe_read_kernel(regval, sizeof(ctx->ax), &ctx->ax);
 		break;
 	case 1:
-		__builtin_memcpy(&data->data, &ctx->dx, sizeof(ctx->dx));
+		bpf_probe_read_kernel(regval, sizeof(ctx->dx), &ctx->dx);
 		break;
 	case 2:
-		__builtin_memcpy(&data->data, &ctx->cx, sizeof(ctx->cx));
+		bpf_probe_read_kernel(regval, sizeof(ctx->cx), &ctx->cx);
 		break;
 	case 3:
-		__builtin_memcpy(&data->data, &ctx->bx, sizeof(ctx->bx));
+		bpf_probe_read_kernel(regval, sizeof(ctx->bx), &ctx->bx);
 		break;
 	case 4:
-		__builtin_memcpy(&data->data, &ctx->si, sizeof(ctx->si));
+		bpf_probe_read_kernel(regval, sizeof(ctx->si), &ctx->si);
 		break;
 	case 5:
-		__builtin_memcpy(&data->data, &ctx->di, sizeof(ctx->di));
+		bpf_probe_read_kernel(regval, sizeof(ctx->di), &ctx->di);
 		break;
 	case 6:
-		__builtin_memcpy(&data->data, &ctx->bp, sizeof(ctx->bp));
+		bpf_probe_read_kernel(regval, sizeof(ctx->bp), &ctx->bp);
 		break;
 	case 7:
-		__builtin_memcpy(&data->data, &ctx->sp, sizeof(ctx->sp));
+		bpf_probe_read_kernel(regval, sizeof(ctx->sp), &ctx->sp);
 		break;
 	case 8:
-		__builtin_memcpy(&data->data, &ctx->r8, sizeof(ctx->r8));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r8), &ctx->r8);
 		break;
 	case 9:
-		__builtin_memcpy(&data->data, &ctx->r9, sizeof(ctx->r9));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r9), &ctx->r9);
 		break;
 	case 10:
-		__builtin_memcpy(&data->data, &ctx->r10, sizeof(ctx->r10));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r10), &ctx->r10);
 		break;
 	case 11:
-		__builtin_memcpy(&data->data, &ctx->r11, sizeof(ctx->r11));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r11), &ctx->r11);
 		break;
 	case 12:
-		__builtin_memcpy(&data->data, &ctx->r12, sizeof(ctx->r12));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r12), &ctx->r12);
 		break;
 	case 13:
-		__builtin_memcpy(&data->data, &ctx->r13, sizeof(ctx->r13));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r13), &ctx->r13);
 		break;
 	case 14:
-		__builtin_memcpy(&data->data, &ctx->r14, sizeof(ctx->r14));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r14), &ctx->r14);
 		break;
 	case 15:
-		__builtin_memcpy(&data->data, &ctx->r15, sizeof(ctx->r15));
+		bpf_probe_read_kernel(regval, sizeof(ctx->r15), &ctx->r15);
 		break;
 	}
+	return;
+}
+
+static __always_inline
+void fetch_args_from_reg(struct pt_regs *ctx, struct arg_data *data, struct arg_rule *rule)
+{
+	read_reg(ctx, rule->reg, (__u64 *)&data->data);
 	bpf_map_push_elem(&arg_queue, data, BPF_EXIST);
 	return;
 }
 
 static __always_inline
-void fetch_args_from_stack(struct pt_regs *ctx, struct arg_data *data, struct arg_rule *rule)
+void fetch_args_from_memory(struct pt_regs *ctx, struct arg_data *data, struct arg_rule *rule)
 {
-	__u64 addr = ctx->sp;
+	__u64 addr = 0;
+	read_reg(ctx, rule->reg, &addr);
+
 	for (int i = 0; i < 8; i++) {
-		if (i == rule->length)
+		if (i == rule->length - 1)
 			break;
 		bpf_probe_read_user(&addr, sizeof(addr), (void *)addr+rule->offsets[i]);
 	}
@@ -199,7 +207,7 @@ void fetch_args(struct pt_regs *ctx, __u64 goid, __u64 ip)
 			fetch_args_from_reg(ctx, data, &rules->rules[i]);
 			break;
 		case 1:
-			fetch_args_from_stack(ctx, data, &rules->rules[i]);
+			fetch_args_from_memory(ctx, data, &rules->rules[i]);
 			break;
 		}
 	}

@@ -105,7 +105,7 @@ func (b *BPF) setArgRules(pc uint64, fetchArgs []*uprobe.FetchArg) (err error) {
 			return fmt.Errorf("too many rules: %d > 8", len(fetchArg.Rules))
 		}
 		rule := GofuncgraphArgRule{
-			Type:   uint8(fetchArg.Rules[0].From),
+			Type:   uint8(fetchArg.Rules[len(fetchArg.Rules)-1].From),
 			Reg:    RegisterConstants[fetchArg.Rules[0].Register],
 			Size:   uint8(fetchArg.Size),
 			Length: uint8(len(fetchArg.Rules) - 1),
@@ -119,6 +119,7 @@ func (b *BPF) setArgRules(pc uint64, fetchArgs []*uprobe.FetchArg) (err error) {
 			}
 		}
 		argRules.Rules[idx] = rule
+		fmt.Printf("add arg rule at %x: %+v\n", pc, rule)
 	}
 	return b.objs.ArgRulesMap.Update(pc, argRules, ebpf.UpdateNoExist)
 }
