@@ -2,9 +2,11 @@ package uprobe
 
 import (
 	debugelf "debug/elf"
+	"errors"
 	"fmt"
 
 	"github.com/jschwinger233/gofuncgraph/elf"
+	log "github.com/sirupsen/logrus"
 )
 
 type ParseOptions struct {
@@ -56,8 +58,13 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 		})
 
 		retOffsets, err := elf.FuncRetOffsets(funcname)
+		if err == nil && len(retOffsets) == 0 {
+			err = errors.New("no ret offsets")
+		}
 		if err != nil {
-			return nil, err
+			log.Warnf("skip %s, failed to get ret offsets: %v", funcname, err)
+			uprobes = uprobes[:len(uprobes)-1]
+			continue
 		}
 		fmt.Printf("[ ")
 		for _, retOffset := range retOffsets {

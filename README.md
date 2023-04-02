@@ -1,46 +1,31 @@
 # gofuncgraph
 
-bpf(2)-based ftrace(1)-like function graph tracer for userspace processes.
+bpf(2)-based ftrace(1)-like function graph tracer for Golang processes.
 
 Limits:
 
-1. Only Works for Go programs for now;
-2. `.symtab` ELF section is required, and `.debug_info` section is preferable;
-3. The Go binary must be built using static linking;
-3. Running on x86-64 little-endian Linux only;
-4. Kernel version has to support bpf(2) and uprobe, and I developped it on 5.14.0;
+1. `.symtab` ELF section and `.(z)debug_info` is required;
+2. Running on x86-64 little-endian Linux only;
+4. Kernel version has to support bpf(2) and uprobe;
 
-# Example
 
-Let's trace dockerd to see how it handles `docker stop`:
+# Usage
 
-Type the command:
-
-```bash
-sudo gofun -d 1 ./bundles/binary-daemon/dockerd '!runtime.*' '!context.*' '!*vendor*' 'github.com/docker/docker/daemon.(*Daemon).containerStop(id=+0(+64(%rdi)):c256, name=+0(+200(%rdi)):c256, name_len=+208(%rdi):s32)'
 ```
+   example: trace a specific function in etcd client "go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire"
+     gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
 
-Explanations:
+   example: trace all functions in etcd client
+     gofun ./bin 'go.etcd.io/etcd/client/v3/*'
 
-1. `-d 1`: search the functions called by `github.com/docker/docker/daemon.(*Daemon).containerStop`, and only search for one layer;
-2. `!runtime.*`: ignore the functions matching the wildcard `runtime.*`;
-3. `!context.*`: ignore the functions matching the wildcard `context.*`;
-4. `!*vendor*`: ignore the functions matching the wildcard `*vendor*`;
-5. `github.com/docker/docker/daemon.(*Daemon).containerStop(id=+0(+64(%rdi)):c256, name=+0(+200(%rdi)):c256, name_len=+208(%rdi):s32)`: attach the function `github.com/docker/docker/daemon.(*Daemon).containerStop`, and fetch the arguments `id`, `name` and `name_len` using [Linux uprobe_tracer](https://docs.kernel.org/trace/uprobetracer.html)'s FETCHARGS syntax.
+   example: trace a specific function and include runtime.chan* builtins
+     gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' 'runtime.chan*'
 
-And will get the results:
-
-![docker-stop-tracing](https://raw.githubusercontent.com/jschwinger233/gofuncgraph/master/assets/docker-stop-tracing.jpg)
+   example: trace a specific function with some arguemnts
+     gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%ax)):c512, n_pfx=+16(%ax):u64, m.s.id=16(0(%ax)):u64)'
+```
 
 # Use cases
 
 1. Wall time profiling;
 2. Execution flow observing;
-
-## Wall time profiling case
-
-Chinese version: https://roamresearch.com/#/app/FEZ/page/C-xt1C2M1
-
-## Execution flow observing
-
-Chinese version: https://roamresearch.com/#/app/FEZ/page/ya-t0xN8m

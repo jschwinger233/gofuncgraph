@@ -46,13 +46,11 @@ func main() {
 example: trace all functions in etcd client
   gofun ./bin 'go.etcd.io/etcd/client/v3/*'
 
-example: trace a specific function and its downstream functions within 3 layers, but exclude the golang builtins
-  gofun --depth 3 ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' '!runtime.*'
+example: trace a specific function and include runtime.chan* builtins
+  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' 'runtime.chan*'
 
-example: trace a specific function with some arguemnts and backtrace
-  gofun --backtrace ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%rax)):c128, n_pfx=+16(%rax):u64, myKey=+0(+24(%rax)):c128)'
-
-For more details, please refer to https://github.com/jschwinger233/gofuncgraph/blob/main/README.md
+example: trace a specific function with some arguemnts
+  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%ax)):c512, n_pfx=+16(%ax):u64, m.s.id=16(0(%ax)):u64 )'
  `,
 		Version: version.VERSION,
 		Flags: []cli.Flag{
