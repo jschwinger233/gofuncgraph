@@ -103,7 +103,11 @@ func (t *Tracer) Start() (err error) {
 	}
 	log.Infof("found %d uprobes\n", len(uprobes))
 
-	if err = t.bpf.Load(uprobes); err != nil {
+	goidOffset, err := t.elf.FindGoidOffset()
+	if err != nil {
+		return
+	}
+	if err = t.bpf.Load(uprobes, bpf.LoadOptions{GoidOffset: goidOffset}); err != nil {
 		return
 	}
 	if err = t.bpf.Attach(t.bin, uprobes); err != nil {

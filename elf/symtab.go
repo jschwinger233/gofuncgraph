@@ -8,12 +8,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (f *ELF) Symbols() (symbols []elf.Symbol, symnames map[string]elf.Symbol, err error) {
-	if _, ok := f.cache["symbols"]; ok {
-		return f.cache["symbols"].([]elf.Symbol), f.cache["symnames"].(map[string]elf.Symbol), nil
+func (e *ELF) Symbols() (symbols []elf.Symbol, symnames map[string]elf.Symbol, err error) {
+	if _, ok := e.cache["symbols"]; ok {
+		return e.cache["symbols"].([]elf.Symbol), e.cache["symnames"].(map[string]elf.Symbol), nil
 	}
 
-	if symbols, err = f.elfFile.Symbols(); err != nil {
+	if symbols, err = e.elfFile.Symbols(); err != nil {
 		return
 	}
 
@@ -23,17 +23,17 @@ func (f *ELF) Symbols() (symbols []elf.Symbol, symnames map[string]elf.Symbol, e
 	for _, symbol := range symbols {
 		symnames[symbol.Name] = symbol
 	}
-	f.cache["symbols"] = symbols
-	f.cache["symnames"] = symnames
+	e.cache["symbols"] = symbols
+	e.cache["symnames"] = symnames
 	return
 }
 
-func (f *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err error) {
+func (e *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err error) {
 	if addr == 0 {
 		err = errors.Wrapf(SymbolNotFoundError, "0")
 		return
 	}
-	symbols, _, err := f.Symbols()
+	symbols, _, err := e.Symbols()
 	if err != nil {
 		return
 	}
@@ -54,8 +54,8 @@ func (f *ELF) ResolveAddress(addr uint64) (syms []elf.Symbol, offset uint, err e
 	return syms, uint(addr - sym.Value), nil
 }
 
-func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
-	_, symnames, err := f.Symbols()
+func (e *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
+	_, symnames, err := e.Symbols()
 	if err != nil {
 		return
 	}
@@ -67,12 +67,12 @@ func (f *ELF) ResolveSymbol(sym string) (symbol elf.Symbol, err error) {
 	return
 }
 
-func (f *ELF) FuncOffset(name string) (offset uint64, err error) {
-	sym, err := f.ResolveSymbol(name)
+func (e *ELF) FuncOffset(name string) (offset uint64, err error) {
+	sym, err := e.ResolveSymbol(name)
 	if err != nil {
 		return
 	}
-	section := f.Section(".text")
+	section := e.Section(".text")
 	return sym.Value - section.Addr + section.Offset, nil
 }
 

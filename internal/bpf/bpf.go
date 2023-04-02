@@ -37,6 +37,10 @@ var RegisterConstants = map[string]uint8{
 	"r15": 15,
 }
 
+type LoadOptions struct {
+	GoidOffset int64
+}
+
 type BPF struct {
 	objs    *GofuncgraphObjects
 	closers []io.Closer
@@ -46,15 +50,18 @@ func New() *BPF {
 	return &BPF{}
 }
 
-func (b *BPF) BpfConfig(fetchArgs bool) interface{} {
+func (b *BPF) BpfConfig(fetchArgs bool, goidOffset int64) interface{} {
 	return struct {
-		FetchArgs bool
+		GoidOffset int64
+		FetchArgs  bool
+		Padding    [7]byte
 	}{
-		FetchArgs: fetchArgs,
+		GoidOffset: goidOffset,
+		FetchArgs:  fetchArgs,
 	}
 }
 
-func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
+func (b *BPF) Load(uprobes []uprobe.Uprobe, opts LoadOptions) (err error) {
 	spec, err := LoadGofuncgraph()
 	if err != nil {
 		return err
@@ -76,7 +83,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe) (err error) {
 			break
 		}
 	}
-	if err = spec.RewriteConstants(map[string]interface{}{"CONFIG": b.BpfConfig(fetchArgs)}); err != nil {
+	if err = spec.RewriteConstants(map[string]interface{}{"CONFIG": b.BpfConfig(fetchArgs, opts.GoidOffset)}); err != nil {
 		return
 	}
 	if err = spec.LoadAndAssign(b.objs, &ebpf.CollectionOptions{

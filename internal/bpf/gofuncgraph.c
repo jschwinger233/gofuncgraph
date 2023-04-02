@@ -8,15 +8,15 @@
 #define ENTPOINT 0
 #define RETPOINT 1
 
-#define GOID_OFFSET 152
-
 #define fsbase_off (offsetof(struct task_struct, thread) \
 		    + offsetof(struct thread_struct, fsbase))
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 struct config {
+	__s64 goid_offset;
 	bool fetch_args;
+	__u8 padding[7];
 };
 
 static volatile const struct config CONFIG = {};
@@ -98,7 +98,7 @@ __u64 get_goid()
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	bpf_probe_read_kernel(&tls_base, sizeof(tls_base), (void *)task + fsbase_off);
 	bpf_probe_read_user(&g_addr, sizeof(g_addr), (void *)(tls_base-8));
-	bpf_probe_read_user(&goid, sizeof(goid), (void *)(g_addr+GOID_OFFSET));
+	bpf_probe_read_user(&goid, sizeof(goid), (void *)(g_addr+CONFIG.goid_offset));
 	return goid;
 }
 

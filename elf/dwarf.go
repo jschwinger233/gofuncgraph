@@ -8,11 +8,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (f *ELF) IterDebugInfo() <-chan *dwarf.Entry {
+func (e *ELF) IterDebugInfo() <-chan *dwarf.Entry {
 	ch := make(chan *dwarf.Entry)
 	go func() {
 		defer close(ch)
-		infoReader := f.dwarfData.Reader()
+		infoReader := e.dwarfData.Reader()
 		for {
 			entry, err := infoReader.Next()
 			if err != nil || entry == nil {
@@ -24,18 +24,18 @@ func (f *ELF) IterDebugInfo() <-chan *dwarf.Entry {
 	return ch
 }
 
-func (f *ELF) NonInlinedSubprogramDIEs() (dies map[string]*dwarf.Entry, err error) {
-	if v, ok := f.cache["subprogramdies"]; ok {
+func (e *ELF) NonInlinedSubprogramDIEs() (dies map[string]*dwarf.Entry, err error) {
+	if v, ok := e.cache["subprogramdies"]; ok {
 		return v.(map[string]*dwarf.Entry), nil
 	}
 
-	_, symnames, err := f.Symbols()
+	_, symnames, err := e.Symbols()
 	if err != nil {
 		return
 	}
 
 	dies = map[string]*dwarf.Entry{}
-	for die := range f.IterDebugInfo() {
+	for die := range e.IterDebugInfo() {
 		if die.Tag == dwarf.TagSubprogram {
 			v := die.Val(dwarf.AttrName)
 			if v == nil {
@@ -62,7 +62,7 @@ func (f *ELF) NonInlinedSubprogramDIEs() (dies map[string]*dwarf.Entry, err erro
 			dies[name] = die
 		}
 	}
-	f.cache["subprogramdies"] = dies
+	e.cache["subprogramdies"] = dies
 	return dies, nil
 }
 
@@ -124,4 +124,39 @@ func (e *ELF) LineInfoForPc(pc uint64) (filename string, line int, err error) {
 	}
 	idx := sort.Search(len(lineEntries), func(i int) bool { return lineEntries[i].Address >= pc }) - 1
 	return lineEntries[idx].File.Name, lineEntries[idx].Line, nil
+}
+
+func (e *ELF) FindGoidOffset() (int64, error) {
+	foundRuntimeG := false
+	for die := range e.IterDebugInfo() {
+		switch die.Tag {
+		case dwarf.TagStructType:
+			v := die.Val(dwarf.AttrName)
+			if v == nil {
+				continue
+			}
+			name := v.(string)
+			if name != "runtime.g" {
+				continue
+			}
+			foundRuntimeG = true
+		case dwarf.TagMember:
+			if foundRuntimeG {
+				v := die.Val(dwarf.AttrName)
+				if v == nil {
+					continue
+				}
+				name := v.(string)
+				if name != "goid" {
+					continue
+				}
+				v = die.Val(dwarf.AttrDataMemberLoc)
+				if v == nil {
+					continue
+				}
+				return v.(int64), nil
+			}
+		}
+	}
+	return 0, errors.New("goid not found")
 }
