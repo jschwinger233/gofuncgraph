@@ -46,7 +46,7 @@ func NewTracer(bin string, args []string) (_ *Tracer, err error) {
 	}, nil
 }
 
-func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]map[string]string, err error) {
+func (t *Tracer) ParseArgs(inputs []string) (in []string, fetch map[string]map[string]string, err error) {
 	fetch = map[string]map[string]string{}
 	for _, input := range inputs {
 		if input[len(input)-1] == ')' {
@@ -84,24 +84,19 @@ func (t *Tracer) ParseArgs(inputs []string) (in, ex []string, fetch map[string]m
 			}
 		}
 
-		if input[0] == '!' {
-			ex = append(ex, input[1:])
-		} else {
-			in = append(in, input)
-		}
+		in = append(in, input)
 	}
 	return
 }
 
 func (t *Tracer) Start() (err error) {
-	in, ex, fetch, err := t.ParseArgs(t.args)
+	in, fetch, err := t.ParseArgs(t.args)
 	if err != nil {
 		return
 	}
 	uprobes, err := uprobe.Parse(t.elf, &uprobe.ParseOptions{
-		Wildcards:   in,
-		ExWildcards: ex,
-		Fetch:       fetch,
+		Wildcards: in,
+		Fetch:     fetch,
 	})
 	if err != nil {
 		return

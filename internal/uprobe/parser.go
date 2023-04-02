@@ -8,9 +8,8 @@ import (
 )
 
 type ParseOptions struct {
-	Wildcards   []string
-	ExWildcards []string
-	Fetch       map[string]map[string]string // funcname: varname: expression
+	Wildcards []string
+	Fetch     map[string]map[string]string // funcname: varname: expression
 }
 
 func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
