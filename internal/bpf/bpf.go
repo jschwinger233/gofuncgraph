@@ -39,6 +39,7 @@ var RegisterConstants = map[string]uint8{
 
 type LoadOptions struct {
 	GoidOffset int64
+	GOffset    int64
 }
 
 type BPF struct {
@@ -50,13 +51,14 @@ func New() *BPF {
 	return &BPF{}
 }
 
-func (b *BPF) BpfConfig(fetchArgs bool, goidOffset int64) interface{} {
+func (b *BPF) BpfConfig(fetchArgs bool, goidOffset, gOffset int64) interface{} {
 	return struct {
-		GoidOffset int64
-		FetchArgs  bool
-		Padding    [7]byte
+		GoidOffset, GOffset int64
+		FetchArgs           bool
+		Padding             [7]byte
 	}{
 		GoidOffset: goidOffset,
+		GOffset:    gOffset,
 		FetchArgs:  fetchArgs,
 	}
 }
@@ -83,7 +85,7 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe, opts LoadOptions) (err error) {
 			break
 		}
 	}
-	if err = spec.RewriteConstants(map[string]interface{}{"CONFIG": b.BpfConfig(fetchArgs, opts.GoidOffset)}); err != nil {
+	if err = spec.RewriteConstants(map[string]interface{}{"CONFIG": b.BpfConfig(fetchArgs, opts.GoidOffset, opts.GOffset)}); err != nil {
 		return
 	}
 	if err = spec.LoadAndAssign(b.objs, &ebpf.CollectionOptions{

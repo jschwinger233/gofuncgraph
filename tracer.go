@@ -107,7 +107,14 @@ func (t *Tracer) Start() (err error) {
 	if err != nil {
 		return
 	}
-	if err = t.bpf.Load(uprobes, bpf.LoadOptions{GoidOffset: goidOffset}); err != nil {
+	gOffset, err := t.elf.FindGOffset()
+	if err != nil {
+		return
+	}
+	if err = t.bpf.Load(uprobes, bpf.LoadOptions{
+		GoidOffset: goidOffset,
+		GOffset:    gOffset,
+	}); err != nil {
 		return
 	}
 	if err = t.bpf.Attach(t.bin, uprobes); err != nil {
