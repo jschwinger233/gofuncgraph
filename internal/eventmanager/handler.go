@@ -32,7 +32,7 @@ func (m *EventManager) Add(event bpf.GofuncgraphEvent) {
 	}
 	if length > 0 {
 		lastEvent := m.goEvents[event.Goid][length-1]
-		if lastEvent.Ip == event.Ip && lastEvent.Bp != event.CallerBp {
+		if lastEvent.Location == event.Location && lastEvent.Ip == event.Ip && lastEvent.Bp != event.CallerBp {
 			// duplicated entry event due to stack expansion/shrinkage
 			log.Debugf("duplicated entry event: %+v", event)
 			m.goEvents[event.Goid][length-1].GofuncgraphEvent = event
