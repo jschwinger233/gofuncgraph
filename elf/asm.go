@@ -1,8 +1,6 @@
 package elf
 
 import (
-	"strings"
-
 	"github.com/pkg/errors"
 	"golang.org/x/arch/x86/x86asm"
 )
@@ -13,23 +11,6 @@ func (e *ELF) FuncInstructions(name string) (insts []x86asm.Inst, addr, offset u
 		return
 	}
 	return e.ResolveInstructions(raw), addr, offset, nil
-}
-
-func (e *ELF) FindGOffset() (offset int64, err error) {
-	insts, _, _, err := e.FuncInstructions("runtime.setg.abi0")
-	if err != nil {
-		return
-	}
-
-	for _, inst := range insts {
-		println(inst.String())
-		if strings.Contains(inst.Op.String(), "MOV") && inst.Args[0] != nil {
-			if mem, ok := inst.Args[0].(x86asm.Mem); ok && mem.Segment == x86asm.FS {
-				return mem.Disp, nil
-			}
-		}
-	}
-	return 0, errors.New("setg asm not found")
 }
 
 func (e *ELF) FuncRetOffsets(name string) (offsets []uint64, err error) {

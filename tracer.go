@@ -111,6 +111,7 @@ func (t *Tracer) Start() (err error) {
 	if err != nil {
 		return
 	}
+	log.Debugf("offset of goid from g is %d, offset of g from fs is -0x%x\n", goidOffset, -gOffset)
 	if err = t.bpf.Load(uprobes, bpf.LoadOptions{
 		GoidOffset: goidOffset,
 		GOffset:    gOffset,
