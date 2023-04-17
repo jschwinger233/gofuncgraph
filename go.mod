@@ -10,6 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.10.3
 	golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15
+	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.0.0-20220627191245-f75cf1eec38b
 )
 

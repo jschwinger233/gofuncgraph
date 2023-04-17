@@ -9,6 +9,8 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -no-strip -target native -type event -type arg_rules -type arg_rule -type arg_data Gofuncgraph ./gofuncgraph.c -- -I./headers
@@ -157,9 +159,17 @@ func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 }
 
 func (b *BPF) Detach() {
-	for _, closer := range b.closers {
-		closer.Close()
+	log.Info("start detaching\n")
+	sem := semaphore.NewWeighted(10)
+	for i, closer := range b.closers {
+		fmt.Printf("closing %d/%d\r", i+1, len(b.closers))
+		sem.Acquire(context.Background(), 1)
+		go func(closer io.Closer) {
+			defer sem.Release(1)
+			closer.Close()
+		}(closer)
 	}
+	fmt.Println()
 }
 
 func (b *BPF) PollEvents(ctx context.Context) chan GofuncgraphEvent {
