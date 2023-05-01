@@ -102,6 +102,11 @@ func (b *BPF) Load(uprobes []uprobe.Uprobe, opts LoadOptions) (err error) {
 				return
 			}
 		}
+		if uprobe.Wanted {
+			if err = b.setWanted(uprobe); err != nil {
+				return
+			}
+		}
 	}
 	return
 }
@@ -135,19 +140,26 @@ func (b *BPF) setArgRules(pc uint64, fetchArgs []*uprobe.FetchArg) (err error) {
 	return b.objs.ArgRulesMap.Update(pc, argRules, ebpf.UpdateNoExist)
 }
 
+func (b *BPF) setWanted(uprobe uprobe.Uprobe) (err error) {
+	return b.objs.ShouldTraceRip.Update(uprobe.Address, true, ebpf.UpdateNoExist)
+}
+
 func (b *BPF) Attach(bin string, uprobes []uprobe.Uprobe) (err error) {
 	ex, err := link.OpenExecutable(bin)
 	if err != nil {
 		return
 	}
-	for _, up := range uprobes {
+	for i, up := range uprobes {
 		var prog *ebpf.Program
 		switch up.Location {
 		case uprobe.AtEntry:
 			prog = b.objs.Ent
 		case uprobe.AtRet:
 			prog = b.objs.Ret
+		case uprobe.AtGoroutineExit:
+			prog = b.objs.GoroutineExit
 		}
+		fmt.Printf("attaching %d/%d\r", i+1, len(uprobes))
 		up, err := ex.Uprobe("", prog, &link.UprobeOptions{Offset: up.AbsOffset})
 		if err != nil {
 			return err

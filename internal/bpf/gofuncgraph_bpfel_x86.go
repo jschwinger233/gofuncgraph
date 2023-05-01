@@ -84,19 +84,22 @@ type GofuncgraphSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GofuncgraphProgramSpecs struct {
-	Ent *ebpf.ProgramSpec `ebpf:"ent"`
-	Ret *ebpf.ProgramSpec `ebpf:"ret"`
+	Ent           *ebpf.ProgramSpec `ebpf:"ent"`
+	GoroutineExit *ebpf.ProgramSpec `ebpf:"goroutine_exit"`
+	Ret           *ebpf.ProgramSpec `ebpf:"ret"`
 }
 
 // GofuncgraphMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GofuncgraphMapSpecs struct {
-	ArgQueue    *ebpf.MapSpec `ebpf:"arg_queue"`
-	ArgRulesMap *ebpf.MapSpec `ebpf:"arg_rules_map"`
-	ArgStack    *ebpf.MapSpec `ebpf:"arg_stack"`
-	EventQueue  *ebpf.MapSpec `ebpf:"event_queue"`
-	EventStack  *ebpf.MapSpec `ebpf:"event_stack"`
+	ArgQueue        *ebpf.MapSpec `ebpf:"arg_queue"`
+	ArgRulesMap     *ebpf.MapSpec `ebpf:"arg_rules_map"`
+	ArgStack        *ebpf.MapSpec `ebpf:"arg_stack"`
+	EventQueue      *ebpf.MapSpec `ebpf:"event_queue"`
+	EventStack      *ebpf.MapSpec `ebpf:"event_stack"`
+	ShouldTraceGoid *ebpf.MapSpec `ebpf:"should_trace_goid"`
+	ShouldTraceRip  *ebpf.MapSpec `ebpf:"should_trace_rip"`
 }
 
 // GofuncgraphObjects contains all objects after they have been loaded into the kernel.
@@ -118,11 +121,13 @@ func (o *GofuncgraphObjects) Close() error {
 //
 // It can be passed to LoadGofuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GofuncgraphMaps struct {
-	ArgQueue    *ebpf.Map `ebpf:"arg_queue"`
-	ArgRulesMap *ebpf.Map `ebpf:"arg_rules_map"`
-	ArgStack    *ebpf.Map `ebpf:"arg_stack"`
-	EventQueue  *ebpf.Map `ebpf:"event_queue"`
-	EventStack  *ebpf.Map `ebpf:"event_stack"`
+	ArgQueue        *ebpf.Map `ebpf:"arg_queue"`
+	ArgRulesMap     *ebpf.Map `ebpf:"arg_rules_map"`
+	ArgStack        *ebpf.Map `ebpf:"arg_stack"`
+	EventQueue      *ebpf.Map `ebpf:"event_queue"`
+	EventStack      *ebpf.Map `ebpf:"event_stack"`
+	ShouldTraceGoid *ebpf.Map `ebpf:"should_trace_goid"`
+	ShouldTraceRip  *ebpf.Map `ebpf:"should_trace_rip"`
 }
 
 func (m *GofuncgraphMaps) Close() error {
@@ -132,6 +137,8 @@ func (m *GofuncgraphMaps) Close() error {
 		m.ArgStack,
 		m.EventQueue,
 		m.EventStack,
+		m.ShouldTraceGoid,
+		m.ShouldTraceRip,
 	)
 }
 
@@ -139,13 +146,15 @@ func (m *GofuncgraphMaps) Close() error {
 //
 // It can be passed to LoadGofuncgraphObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GofuncgraphPrograms struct {
-	Ent *ebpf.Program `ebpf:"ent"`
-	Ret *ebpf.Program `ebpf:"ret"`
+	Ent           *ebpf.Program `ebpf:"ent"`
+	GoroutineExit *ebpf.Program `ebpf:"goroutine_exit"`
+	Ret           *ebpf.Program `ebpf:"ret"`
 }
 
 func (p *GofuncgraphPrograms) Close() error {
 	return _GofuncgraphClose(
 		p.Ent,
+		p.GoroutineExit,
 		p.Ret,
 	)
 }

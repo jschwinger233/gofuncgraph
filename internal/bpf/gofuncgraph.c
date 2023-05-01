@@ -92,6 +92,20 @@ struct bpf_map_def SEC("maps") event_stack = {
 	.max_entries = 1,
 };
 
+struct bpf_map_def SEC("maps") should_trace_goid = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(__u64),
+	.value_size = sizeof(bool),
+	.max_entries = 10000,
+};
+
+struct bpf_map_def SEC("maps") should_trace_rip = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(__u64),
+	.value_size = sizeof(bool),
+	.max_entries = 10000,
+};
+
 static __always_inline
 __u64 get_goid()
 {
@@ -224,8 +238,18 @@ int ent(struct pt_regs *ctx)
 	__builtin_memset(e, 0, sizeof(*e));
 
 	e->goid = get_goid();
-	e->location = ENTPOINT;
 	e->ip = ctx->ip;
+	if (!bpf_map_lookup_elem(&should_trace_rip, &e->ip)) {
+		if (!bpf_map_lookup_elem(&should_trace_goid, &e->goid))
+			return 0;
+
+	} else if (!bpf_map_lookup_elem(&should_trace_goid, &e->goid)) {
+		__u64 should_trace = true;
+		bpf_map_update_elem(&should_trace_goid, &e->goid, &should_trace,
+				    BPF_ANY);
+	}
+
+	e->location = ENTPOINT;
 	e->time_ns = bpf_ktime_get_ns();
 	e->bp = ctx->sp - 8;
 	e->caller_bp = ctx->bp;
@@ -253,9 +277,20 @@ int ret(struct pt_regs *ctx)
 	__builtin_memset(e, 0, sizeof(*e));
 
 	e->goid = get_goid();
+	if (!bpf_map_lookup_elem(&should_trace_goid, &e->goid))
+		return 0;
+
 	e->location = RETPOINT;
 	e->ip = ctx->ip;
 	e->time_ns = bpf_ktime_get_ns();
 
 	return bpf_map_push_elem(&event_queue, e, BPF_EXIST);
+}
+
+SEC("uprobe/goroutine_exit")
+int goroutine_exit(struct pt_regs *ctx)
+{
+	__u64 goid = get_goid();
+	bpf_map_delete_elem(&should_trace_goid, &goid);
+	return 0;
 }
