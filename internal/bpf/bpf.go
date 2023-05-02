@@ -174,7 +174,7 @@ func (b *BPF) Detach() {
 	log.Info("start detaching\n")
 	sem := semaphore.NewWeighted(10)
 	for i, closer := range b.closers {
-		fmt.Printf("closing %d/%d\r", i+1, len(b.closers))
+		fmt.Printf("detaching %d/%d\r", i+1, len(b.closers))
 		sem.Acquire(context.Background(), 1)
 		go func(closer io.Closer) {
 			defer sem.Release(1)

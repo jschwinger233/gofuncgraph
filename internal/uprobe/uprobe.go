@@ -5,6 +5,7 @@ type UprobeLocation int
 const (
 	AtEntry UprobeLocation = iota
 	AtRet
+	AtGoroutineExit
 )
 
 type Uprobe struct {
@@ -14,4 +15,5 @@ type Uprobe struct {
 	RelOffset uint64
 	Location  UprobeLocation
 	FetchArgs []*FetchArg
+	Wanted    bool
 }

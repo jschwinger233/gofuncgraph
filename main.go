@@ -59,6 +59,14 @@ example: trace a specific function with some arguemnts
 				Value: false,
 				Usage: "enable debug logging",
 			},
+			&cli.BoolFlag{
+				Name:  "exclude-vendor",
+				Value: true,
+			},
+			&cli.StringSliceFlag{
+				Name:     "uprobe-wildcards",
+				Required: true,
+			},
 		},
 		Before: func(c *cli.Context) error {
 			if c.Bool("debug") {
@@ -74,7 +82,7 @@ example: trace a specific function with some arguemnts
 				return cli.ShowAppHelp(ctx)
 			}
 
-			tracer, err := NewTracer(bin, args)
+			tracer, err := NewTracer(bin, ctx.Bool("exclude-vendor"), ctx.StringSlice("uprobe-wildcards"), args)
 			if err != nil {
 				return
 			}

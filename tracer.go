@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/jschwinger233/gofuncgraph/internal/bpf"
 	"github.com/jschwinger233/gofuncgraph/internal/eventmanager"
 	"github.com/jschwinger233/gofuncgraph/internal/uprobe"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -24,23 +26,27 @@ func init() {
 }
 
 type Tracer struct {
-	bin  string
-	elf  *elf.ELF
-	args []string
+	bin             string
+	elf             *elf.ELF
+	excludeVendor   bool
+	uprobeWildcards []string
+	args            []string
 
 	bpf *bpf.BPF
 }
 
-func NewTracer(bin string, args []string) (_ *Tracer, err error) {
+func NewTracer(bin string, excludeVendor bool, uprobeWildcards, args []string) (_ *Tracer, err error) {
 	elf, err := elf.New(bin)
 	if err != nil {
 		return
 	}
 
 	return &Tracer{
-		bin:  bin,
-		elf:  elf,
-		args: args,
+		bin:             bin,
+		elf:             elf,
+		excludeVendor:   excludeVendor,
+		uprobeWildcards: uprobeWildcards,
+		args:            args,
 
 		bpf: bpf.New(),
 	}, nil
@@ -95,13 +101,29 @@ func (t *Tracer) Start() (err error) {
 		return
 	}
 	uprobes, err := uprobe.Parse(t.elf, &uprobe.ParseOptions{
-		Wildcards: in,
-		Fetch:     fetch,
+		ExcludeVendor:   t.excludeVendor,
+		UprobeWildcards: t.uprobeWildcards,
+		OutputWildcards: in,
+		Fetch:           fetch,
 	})
 	if err != nil {
 		return
 	}
-	log.Infof("found %d uprobes\n", len(uprobes))
+
+requireConfirm:
+	fmt.Fprintf(os.Stdout, "found %d uprobes, large number of uprobes (>1000) need long time for attaching and detaching, continue? [Y/n]\n", len(uprobes))
+	input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	switch strings.TrimSpace(input) {
+	case "n", "N":
+		return
+	case "y", "Y":
+		break
+	default:
+		goto requireConfirm
+	}
 
 	goidOffset, err := t.elf.FindGoidOffset()
 	if err != nil {
