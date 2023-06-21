@@ -39,16 +39,20 @@ func Parse(elf *elf.ELF, opts *ParseOptions) (uprobes []Uprobe, err error) {
 						continue
 					}
 					attachFuncs = append(attachFuncs, symbol.Name)
+					if len(opts.OutputWildcards) == 0 {
+						wantedFuncs[symbol.Name] = true
+					} else {
+						for _, wc := range opts.OutputWildcards {
+							if MatchWildcard(wc, symbol.Name) {
+								wantedFuncs[symbol.Name] = true
+								break
+							}
+						}
+					}
 					break
 				}
 			}
 
-			for _, wc := range opts.OutputWildcards {
-				if MatchWildcard(wc, symbol.Name) {
-					wantedFuncs[symbol.Name] = nil
-					break
-				}
-			}
 		}
 	}
 
