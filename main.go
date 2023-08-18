@@ -39,20 +39,9 @@ func main() {
 	app := &cli.App{
 		Name: "gofun",
 		// TODO@zc: kernel version
-		Usage: "bpf(2)-based ftrace(1)-like function graph tracer for Go! \n(only non-stripped non-PIE-built Golang ELF on x86-64 little-endian Linux is supported for now)",
-		UsageText: `example: trace a specific function in etcd client "go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire"
-  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire'
-
-example: trace all functions in etcd client
-  gofun ./bin 'go.etcd.io/etcd/client/v3/*'
-
-example: trace a specific function and include runtime.chan* builtins
-  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire' 'runtime.chan*'
-
-example: trace a specific function with some arguemnts
-  gofun ./bin 'go.etcd.io/etcd/client/v3/concurrency.(*Mutex).tryAcquire(pfx=+0(+8(%ax)):c512, n_pfx=+16(%ax):u64, m.s.id=16(0(%ax)):u64 )'
- `,
-		Version: version.VERSION,
+		Usage:     "bpf(2)-based ftrace(1)-like function graph tracer for Go! \n(only non-stripped non-PIE-built Golang ELF on x86-64 little-endian Linux is supported for now)",
+		UsageText: `See https://github.com/jschwinger233/gofuncgraph for usage examples`,
+		Version:   version.VERSION,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "debug",
