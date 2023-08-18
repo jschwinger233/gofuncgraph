@@ -3,8 +3,8 @@ before:
     - go mod download
 
 builds:
-  - id: gofun
-    binary: gofun
+  - id: gofuncgraph
+    binary: gofuncgraph
     env:
       - CGO_ENABLED=0
     ldflags:
